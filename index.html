@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0b0b0b">
+<title>Nuevo Pacto</title>
+<!--
+=====================================================================
+ NUEVO PACTO - Iglesia Evangelica Pentecostes (SCV)
+ Single-file church planning app. Mobile first. Spanish default.
+ Version 0.3  Built by Todd Marshall with Claude.
+
+ FILE MAP (search for the === banners):
+   === CSS ===              theme variables (light/dark), layout
+   === CONFIG ===           services, weekly events, age groups, roles
+   === I18N ===             every UI string, Spanish + English
+   === DATA STORE ===       load/save. Swap this section for a backend.
+   === DEMO DATA ===        sample people/posts so the demo is not empty
+   === HELPERS ===          dates, ids, escaping, permissions
+   === VIEWS ===            one function per screen (viewHome, viewKids...)
+   === ACTIONS (A.) ===     everything a button can do
+   === INIT ===             startup
+ See AI-EDIT-GUIDE.md next to this file before changing anything.
+=====================================================================
+-->
+<style>
+/* === CSS === */
+:root{
+  --black:#0b0b0b; --y:#f5c518; --o:#f26b1d;
+  --red:#c62828; --gold:#e6a817; --blue:#1e63b8; --purple:#7b1fa2;
+  --bg:#f4f3ef; --card:#ffffff; --text:#171717; --muted:#6b6b6b; --border:#e3e1da; --soft:#faf7ee;
+  --nav-h:64px;
+}
+[data-theme="dark"]{
+  --bg:#121212; --card:#1d1d1d; --text:#f2f2f2; --muted:#a3a3a3; --border:#2e2e2e; --soft:#262318;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0 0 .4em;line-height:1.2}
+h2{font-size:1.25rem}h3{font-size:1.05rem}
+a{color:var(--blue)}
+/* header */
+.top{position:sticky;top:0;z-index:20;background:var(--black);color:#fff;display:flex;align-items:center;gap:10px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
+.top img{height:44px;width:44px;border-radius:10px;object-fit:cover}
+.top .name{flex:1;line-height:1.1}
+.top .name b{font-size:1.15rem;color:var(--y)}
+.top .name small{display:block;color:#bbb;font-size:.7rem;letter-spacing:.08em}
+.lang{background:var(--y);color:#111;border:0;border-radius:999px;padding:8px 14px;font-weight:800;font-size:.95rem;cursor:pointer}
+.lang span{opacity:.45}.lang span.on{opacity:1}
+.icon-btn{background:#2a2a2a;color:#fff;border:0;border-radius:999px;width:40px;height:40px;font-size:1.15rem;cursor:pointer}
+/* layout */
+main{padding:14px 14px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card.accent-red{border-left:6px solid var(--red)}.card.accent-gold{border-left:6px solid var(--gold)}
+.card.accent-blue{border-left:6px solid var(--blue)}.card.accent-purple{border-left:6px solid var(--purple)}
+.card.pastor{background:linear-gradient(135deg,var(--black),#2a2410);color:#fff;border:1px solid var(--y)}
+.card.pastor .muted{color:#ddd}
+.muted{color:var(--muted);font-size:.9rem}
+.row{display:flex;gap:10px;align-items:center}.row.wrap{flex-wrap:wrap}.grow{flex:1}
+.right{margin-left:auto}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--border);color:var(--text);display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.p{background:var(--o);color:#fff}.btn.y{background:var(--y);color:#111}.btn.b{background:var(--blue);color:#fff}
+.btn.r{background:var(--red);color:#fff}.btn.g{background:#2e7d32;color:#fff}.btn.pu{background:var(--purple);color:#fff}
+.btn.sm{padding:7px 11px;font-size:.85rem;border-radius:9px}.btn.block{width:100%}.btn.ghost{background:transparent;border:1px solid var(--border)}
+.btn:disabled{opacity:.45}
+.chip{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.78rem;font-weight:700;background:var(--soft);border:1px solid var(--border)}
+.chip.red{background:var(--red);color:#fff;border:0}.chip.gold{background:var(--gold);color:#111;border:0}
+.chip.blue{background:var(--blue);color:#fff;border:0}.chip.purple{background:var(--purple);color:#fff;border:0}
+.chip.green{background:#2e7d32;color:#fff;border:0}
+input[type=text],input[type=password],input[type=date],input[type=time],input[type=tel],input[type=email],input[type=search],input[type=number],select,textarea{
+  width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--card);margin:4px 0 10px}
+textarea{min-height:90px;resize:vertical}
+label.f{display:block;font-size:.82rem;font-weight:700;color:var(--muted);margin-top:6px}
+.list .item{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--border)}
+.list .item:last-child{border-bottom:0}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--o);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.avatar.blue{background:var(--blue)}.avatar.purple{background:var(--purple)}.avatar.gold{background:var(--gold);color:#111}
+.toggle{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);flex:none;display:flex;align-items:center;justify-content:center}
+.toggle.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
+.tabs button{flex:none;border:0;border-radius:999px;padding:9px 14px;background:var(--card);border:1px solid var(--border);font-weight:700;cursor:pointer}
+.tabs button.on{background:var(--black);color:var(--y);border-color:var(--black)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 10px;border-radius:16px;background:var(--card);border:1px solid var(--border);font-weight:800;cursor:pointer;text-align:center}
+.big .ic{font-size:2rem}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dh{text-align:center;font-size:.72rem;color:var(--muted);font-weight:700}
+.cal .d{aspect-ratio:1;border-radius:10px;background:var(--card);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.9rem;cursor:pointer;gap:3px}
+.cal .d.other{opacity:.3}.cal .d.today{border-color:var(--o);font-weight:800;color:var(--o)}.cal .d.sel{background:var(--black);color:var(--y)}
+.dots{display:flex;gap:2px}.dot{width:6px;height:6px;border-radius:50%}
+.dot.red{background:var(--red)}.dot.gold{background:var(--gold)}.dot.blue{background:var(--blue)}.dot.purple{background:var(--purple)}.dot.o{background:var(--o)}
+/* posts */
+.post img.photo{width:100%;border-radius:12px;margin-top:8px;max-height:420px;object-fit:cover}
+.post .meta{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.react{border:1px solid var(--border);background:transparent;border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:700}
+.react.on{background:var(--y);color:#111;border-color:var(--y)}
+.comment{padding:8px 10px;border-radius:10px;background:var(--soft);margin-top:6px;font-size:.92rem}
+/* nav */
+nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--black);display:flex;z-index:20}
+nav button{flex:1;border:0;background:transparent;color:#9a9a9a;font-size:.68rem;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+nav button .ic{font-size:1.45rem}
+nav button.on{color:var(--y)}
+/* modal + toast */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:var(--card);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.modal .bar{width:44px;height:5px;border-radius:3px;background:var(--border);margin:0 auto 12px}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 20px);transform:translateX(-50%);background:var(--black);color:var(--y);padding:10px 18px;border-radius:999px;font-weight:700;z-index:60;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1}
+.bar-row{display:flex;align-items:flex-end;gap:6px;height:90px}
+.bar-row div{flex:1;background:var(--o);border-radius:6px 6px 0 0;position:relative;min-height:3px}
+.bar-row div span{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:.7rem;font-weight:700}
+.bar-row div small{position:absolute;bottom:-16px;left:0;right:0;text-align:center;font-size:.6rem;color:var(--muted)}
+.allergy{background:#ffe4e4;color:#8a1111;border-radius:8px;padding:4px 8px;font-size:.8rem;font-weight:700;display:inline-block}
+[data-theme="dark"] .allergy{background:#4a1a1a;color:#ffb3b3}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.hymn{display:flex;gap:10px;align-items:center}
+.hymn .thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex:none}
+pre.lyrics .chordline{color:var(--o);font-weight:800}
+.badge{background:var(--red);color:#fff;border-radius:999px;font-size:.7rem;padding:2px 7px;margin-left:4px}
+pre.lyrics{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;background:var(--soft);padding:12px;border-radius:12px}
+.hint{font-size:.8rem;color:var(--muted);margin:-4px 0 10px}
+</style>
+</head>
+<body>
+<header class="top">
+  <img id="logo" alt="Nuevo Pacto">
+  <div class="name"><b>Nuevo Pacto</b><small>IGLESIA EVANGELICA PENTECOSTES</small></div>
+  <button class="lang" onclick="A.toggleLang()" aria-label="Español / English"><span id="l-es">ES</span> | <span id="l-en">EN</span></button>
+  <button class="icon-btn" onclick="A.toggleTheme()" id="themeBtn" aria-label="Tema">🌙</button>
+</header>
+<main id="main"></main>
+<nav id="nav"></nav>
+<div class="overlay" id="overlay" onclick="if(event.target===this)A.closeModal()"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* === CONFIG === */
+const CONFIG = {
+  churchName: 'Nuevo Pacto',
+  facebook: 'https://www.facebook.com/p/IGLESIA-NUEVO-PACTO-SCV-100090258734080/',
+  // Weekly schedule. dow: 0=Sunday ... 6=Saturday. nth: only the Nth such weekday of the month.
+  // kind:'service' = attendance + kids check-in happen here. Times for weekday events are guesses, edit freely.
+  weekly: [
+    {dow:1, time:'19:00', es:'Estudio Bíblico (Adultos)',           en:'Bible Study (Adults)',          color:'blue',   kind:'study'},
+    {dow:2, time:'19:00', es:'Servicio de Jóvenes',                 en:'Youth Service',                 color:'purple', kind:'youth'},
+    {dow:3, time:'18:00', es:'Evangelismo en la calle y Podcast',   en:'Street Evangelism & Podcast',   color:'gold',   kind:'outreach'},
+    {dow:4, time:'19:00', es:'Ensayo del Equipo de Alabanza',       en:'Worship Team Rehearsal',        color:'gold',   kind:'worship'},
+    {dow:5, time:'19:00', es:'Servicio General',                    en:'Regular Service',               color:'red',    kind:'service'},
+    {dow:6, nth:2, time:'19:00', es:'Ayuno y Vigilia',              en:'Fasting & Vigil',               color:'purple', kind:'vigil'},
+    {dow:0, time:'12:00', es:'Servicio General',                    en:'Regular Service',               color:'red',    kind:'service'},
+    {dow:0, time:'16:00', es:'Servicio General',                    en:'Regular Service',               color:'red',    kind:'service'},
+  ],
+  // Kids classes by age (inclusive). Children are placed automatically by birthdate.
+  ageGroups: [
+    {id:'g1', min:0,  max:3,  es:'Bebés (0-3)',      en:'Babies (0-3)'},
+    {id:'g2', min:4,  max:7,  es:'Niños (4-7)',      en:'Kids (4-7)'},
+    {id:'g3', min:8,  max:11, es:'Pre-jóvenes (8-11)', en:'Preteens (8-11)'},
+    {id:'g4', min:12, max:14, es:'Jóvenes (12-14)',  en:'Youth (12-14)'},
+  ],
+  // Roles and what each can do. Add a role here and it appears in the member editor.
+  roles: {
+    pastor:  {es:'Pastor',             en:'Pastor',         can:['pastorPost','edit','kids','prayer','attendance']},
+    admin:   {es:'Administrador',      en:'Admin',          can:['edit','kids','prayer','attendance','admin']},
+    lead:    {es:'Líder de ministerio',en:'Ministry lead',  can:['edit','attendance']},
+    teacher: {es:'Maestro/a de niños', en:'Kids teacher',   can:['kids']},
+    prayer:  {es:'Líder de oración',   en:'Prayer lead',    can:['prayer']},
+    member:  {es:'Miembro',            en:'Member',         can:[]},
+  },
+  // Shared backend. Leave both empty for a local-only demo (data stays on each phone).
+  // Fill in from Supabase > Project Settings > API. The anon key is public by design; RLS in supabase_setup.sql does the protecting.
+  supabase: { url: 'https://jtgxwrsazwgvaxbhwvfi.supabase.co', anonKey: 'sb_publishable_n1-o65RBRfuh7cnOvjdLqQ_nU41igoB' },
+  followUpWeeks: 3,      // "haven't seen them" list threshold
+  maxPhotoPx: 1000,      // photos are shrunk to this before saving
+};
+
+/* === I18N ===  Every UI string. Add a key to BOTH languages. t('key') returns it. */
+const T = {
+es:{
+  nav_home:'Inicio', nav_cal:'Calendario', nav_att:'Asistencia', nav_kids:'Niños', nav_more:'Más',
+  next_service:'Próximo servicio', confirm_me:'Voy a asistir', confirmed:'Confirmado', confirmed_n:'confirmados',
+  serving:'Te toca servir', bulletin:'Tablón de anuncios', write_post:'Escribe un anuncio...', post:'Publicar',
+  pastor_msg:'Mensaje del Pastor', pin:'Fijar arriba', photo:'Foto', amen:'Amén', comments:'Comentarios',
+  write_comment:'Escribe un comentario...', send:'Enviar', translate:'Traducir', delete:'Eliminar', edit:'Editar',
+  cancel:'Cancelar', save:'Guardar', close:'Cerrar', add:'Agregar', search:'Buscar...', none:'Nada por aquí todavía.',
+  today:'Hoy', events_on:'Eventos del', add_event:'Nuevo evento', title:'Título', date:'Fecha', time:'Hora',
+  place:'Lugar', details:'Detalles', ministry:'Ministerio', rsvp:'Asistiré', going:'van', add_to_phone:'Agregar a mi calendario',
+  weekly_event:'Evento semanal', service:'Servicio', mark_attendance:'Pasar lista', present:'Presentes',
+  visitor:'Visitante', add_visitor:'Agregar visitante', name:'Nombre', phone:'Teléfono', reports:'Reportes',
+  summary:'Resumen', followup:'Seguimiento', history:'Historial', not_seen:'No han venido en', weeks:'semanas',
+  pick_person:'Elige una persona', services_attended:'servicios asistidos', shifts:'Turnos de servicio',
+  add_shift:'Nuevo turno', who_serves:'¿Quiénes sirven?', kids_checkin:'Entrada y salida de niños',
+  checkin:'Entrada', checkout:'Salida', dropped_by:'Entregado por', picked_by:'Recogido por', id_checked:'Identificación verificada',
+  approved_pickup:'Personas autorizadas para recoger', allergies:'Alergias', in_class:'en clase', no_kids:'No hay niños en este grupo.',
+  only_parents:'Solo los padres y las personas autorizadas pueden recoger.', needs_id:'Marca que verificaste la identificación.',
+  hymns:'Himnos y cantos', this_sunday:'Este domingo', all_songs:'Todos', add_hymn:'Nuevo canto', song_title:'Título del canto',
+  key:'Tono', lyrics_chords:'Letra y acordes (opcional)', upload_photo:'Subir foto de la hoja', in_setlist:'En la lista de este domingo',
+  bible:'Estudio Bíblico', month_theme:'Tema del mes', book:'Libro', teacher:'Maestro', passage:'Pasaje', week_of:'Semana del',
+  add_week:'Agregar semana', year_glance:'Año de un vistazo', notes:'Notas',
+  prayer:'Peticiones de oración', prayer_intro:'Tu petición solo la ven los líderes de oración.', write_prayer:'Escribe tu petición...',
+  anonymous:'Enviar anónimo', answered:'Contestada', mark_answered:'Marcar contestada', prayer_sent:'Petición enviada. Estamos orando por ti.',
+  prayer_only_leads:'Solo los líderes de oración pueden ver la lista.',
+  members:'Miembros', households:'Familias', add_member:'Nuevo miembro', import:'Importar lista', export:'Exportar',
+  first:'Nombre', last:'Apellido', email:'Correo', birthdate:'Fecha de nacimiento', role:'Rol', household:'Familia',
+  new_household:'Nueva familia', family_name:'Nombre de la familia', parents:'Padres', children:'Niños', add_child:'Agregar niño',
+  child_name:'Nombre del niño', pickup_list:'Autorizados para recoger (uno por línea)', import_hint:'Pega las filas desde Excel (con encabezados: Nombre, Apellido, Teléfono, Correo, Fecha de nacimiento, Ministerio) o un archivo CSV.',
+  imported:'importados', settings:'Ajustes', who_are_you:'¿Quién eres?', language:'Idioma', theme:'Tema', dark:'Oscuro', light:'Claro',
+  backup:'Respaldo', download_backup:'Descargar respaldo', restore_backup:'Restaurar respaldo', load_demo:'Cargar datos de demostración',
+  wipe:'Borrar todo', wipe_confirm:'¿Borrar TODOS los datos de este teléfono?', about:'Acerca de', version:'Versión',
+  facebook:'Facebook de la iglesia', saved:'Guardado', deleted:'Eliminado', no_permission:'No tienes permiso para esto.',
+  logged_as:'Estás usando la app como', remove_confirm:'¿Eliminar?', removed_from:'quitado de', added:'agregado',
+  pick_service:'Elige el servicio', no_service:'No hay servicio ese día.', mark_by_tap:'Toca el nombre para marcar presente.',
+  count:'Total', last_services:'Últimos servicios', group:'Grupo', all:'Todos', ministries_hint:'Ej.: Alabanza, Ujieres, Niños',
+  age:'años', in_now:'Dentro', out_now:'Salió', not_here:'No ha llegado', parents_only:'Padres de esta familia',
+  translate_hint:'Se abre el traductor de Google con el texto.', upload_hint:'Toca para elegir una foto',
+  day_mon:'L', day_tue:'M', day_wed:'X', day_thu:'J', day_fri:'V', day_sat:'S', day_sun:'D',
+  groups:'Grupos', group:'Grupo', my_groups:'Mis grupos', new_group:'Nuevo grupo', group_name:'Nombre del grupo', group_members:'Integrantes',
+  only_members:'Solo los integrantes de este grupo ven esta página.', write_group_post:'Escribe al grupo...', color:'Color',
+  add_english:'+ English', add_spanish:'+ Español', second_lang_hint:'Opcional: escribe el mismo mensaje en el otro idioma y cada persona lo verá en el suyo.',
+  admin_inbox:'Buzón del administrador', msg_admin:'Mensaje al administrador', msg_admin_intro:'Solo el administrador lo ve. Úsalo para pedir acceso, permisos o reportar un problema.',
+  write_msg:'Escribe tu mensaje...', sent:'Enviado', from:'De', mark_read:'Marcar leído', unread:'sin leer',
+  class_override:'Clase', auto_by_age:'Automática por edad', add_kid_here:'Agregar niño', pick_household:'Elige la familia',
+  chords_hint:'Escribe los acordes entre corchetes antes de la sílaba: [D]El firma[G]mento', other:'Otro',
+  sign_in:'Entrar', sign_up:'Crear cuenta', forgot:'Olvidé mi contraseña', password:'Contraseña', new_password:'Nueva contraseña',
+  your_name:'Tu nombre completo', create_account:'Crear mi cuenta', back_to_login:'Volver a entrar', send_reset:'Enviar enlace',
+  reset_sent:'Revisa tu correo. Te enviamos un enlace para cambiar tu contraseña.', set_password:'Guardar contraseña', pw_changed:'Contraseña actualizada',
+  account_created:'Cuenta creada. Revisa tu correo y confirma tu dirección. Después el administrador debe aprobarla antes de que puedas entrar.', waiting:'Tu cuenta está esperando aprobación del administrador.',
+  sign_out:'Salir', account:'Mi cuenta', change_password:'Cambiar contraseña', users:'Usuarios y accesos', pending:'Pendientes', approved_users:'Aprobados',
+  approve:'Aprobar', revoke:'Quitar acceso', link_member:'Vincular con miembro', new_member_from:'Crear miembro nuevo con este nombre',
+  sync_error:'No se pudo guardar en línea. Revisa tu conexión.', loading:'Cargando...', online:'En línea', offline_demo:'Modo demostración (solo este teléfono)',
+  login_failed:'Correo o contraseña incorrectos.', pw_short:'La contraseña debe tener al menos 8 caracteres.', connecting:'Conectando...',
+  months:['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
+  days:['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+},
+en:{
+  nav_home:'Home', nav_cal:'Calendar', nav_att:'Attendance', nav_kids:'Kids', nav_more:'More',
+  next_service:'Next service', confirm_me:"I'll be there", confirmed:'Confirmed', confirmed_n:'confirmed',
+  serving:'You are serving', bulletin:'Bulletin board', write_post:'Write an announcement...', post:'Post',
+  pastor_msg:'Message from the Pastor', pin:'Pin to top', photo:'Photo', amen:'Amen', comments:'Comments',
+  write_comment:'Write a comment...', send:'Send', translate:'Translate', delete:'Delete', edit:'Edit',
+  cancel:'Cancel', save:'Save', close:'Close', add:'Add', search:'Search...', none:'Nothing here yet.',
+  today:'Today', events_on:'Events on', add_event:'New event', title:'Title', date:'Date', time:'Time',
+  place:'Place', details:'Details', ministry:'Ministry', rsvp:"I'm going", going:'going', add_to_phone:'Add to my phone calendar',
+  weekly_event:'Weekly event', service:'Service', mark_attendance:'Take attendance', present:'Present',
+  visitor:'Visitor', add_visitor:'Add visitor', name:'Name', phone:'Phone', reports:'Reports',
+  summary:'Summary', followup:'Follow-up', history:'History', not_seen:'Not seen in', weeks:'weeks',
+  pick_person:'Pick a person', services_attended:'services attended', shifts:'Serving schedule',
+  add_shift:'New shift', who_serves:'Who is serving?', kids_checkin:'Kids check-in / check-out',
+  checkin:'Check in', checkout:'Check out', dropped_by:'Dropped off by', picked_by:'Picked up by', id_checked:'ID verified',
+  approved_pickup:'Approved pickup people', allergies:'Allergies', in_class:'in class', no_kids:'No children in this group.',
+  only_parents:'Only parents and approved people can pick up.', needs_id:'Please confirm you checked the ID.',
+  hymns:'Hymns & songs', this_sunday:'This Sunday', all_songs:'All', add_hymn:'New song', song_title:'Song title',
+  key:'Key', lyrics_chords:'Lyrics & chords (optional)', upload_photo:'Upload photo of the sheet', in_setlist:"On this Sunday's list",
+  bible:'Bible Study', month_theme:'Theme of the month', book:'Book', teacher:'Teacher', passage:'Passage', week_of:'Week of',
+  add_week:'Add week', year_glance:'Year at a glance', notes:'Notes',
+  prayer:'Prayer requests', prayer_intro:'Only the prayer leads see your request.', write_prayer:'Write your request...',
+  anonymous:'Send anonymously', answered:'Answered', mark_answered:'Mark answered', prayer_sent:'Request sent. We are praying for you.',
+  prayer_only_leads:'Only prayer leads can see the list.',
+  members:'Members', households:'Families', add_member:'New member', import:'Import list', export:'Export',
+  first:'First name', last:'Last name', email:'Email', birthdate:'Birthdate', role:'Role', household:'Family',
+  new_household:'New family', family_name:'Family name', parents:'Parents', children:'Children', add_child:'Add child',
+  child_name:"Child's name", pickup_list:'Approved to pick up (one per line)', import_hint:'Paste rows from Excel (with headers: First, Last, Phone, Email, Birthdate, Ministry) or a CSV file.',
+  imported:'imported', settings:'Settings', who_are_you:'Who are you?', language:'Language', theme:'Theme', dark:'Dark', light:'Light',
+  backup:'Backup', download_backup:'Download backup', restore_backup:'Restore backup', load_demo:'Load demo data',
+  wipe:'Erase everything', wipe_confirm:'Erase ALL data on this phone?', about:'About', version:'Version',
+  facebook:'Church Facebook', saved:'Saved', deleted:'Deleted', no_permission:"You don't have permission for this.",
+  logged_as:'You are using the app as', remove_confirm:'Remove?', removed_from:'removed from', added:'added',
+  pick_service:'Pick the service', no_service:'No service that day.', mark_by_tap:'Tap a name to mark present.',
+  count:'Total', last_services:'Last services', group:'Group', all:'All', ministries_hint:'e.g. Worship, Ushers, Kids',
+  age:'yrs', in_now:'In', out_now:'Out', not_here:'Not arrived', parents_only:'Parents in this family',
+  translate_hint:'Opens Google Translate with the text.', upload_hint:'Tap to choose a photo',
+  day_mon:'M', day_tue:'T', day_wed:'W', day_thu:'T', day_fri:'F', day_sat:'S', day_sun:'S',
+  groups:'Groups', group:'Group', my_groups:'My groups', new_group:'New group', group_name:'Group name', group_members:'Members',
+  only_members:'Only members of this group see this page.', write_group_post:'Write to the group...', color:'Color',
+  add_english:'+ English', add_spanish:'+ Español', second_lang_hint:'Optional: write the same message in the other language and each person sees their own.',
+  admin_inbox:'Administrator inbox', msg_admin:'Message the administrator', msg_admin_intro:'Only the administrator sees it. Use it to ask for access, permissions or report a problem.',
+  write_msg:'Write your message...', sent:'Sent', from:'From', mark_read:'Mark read', unread:'unread',
+  class_override:'Class', auto_by_age:'Automatic by age', add_kid_here:'Add child', pick_household:'Pick the family',
+  chords_hint:'Put chords in brackets before the syllable: [D]El firma[G]mento', other:'Other',
+  sign_in:'Sign in', sign_up:'Create account', forgot:'Forgot my password', password:'Password', new_password:'New password',
+  your_name:'Your full name', create_account:'Create my account', back_to_login:'Back to sign in', send_reset:'Send link',
+  reset_sent:'Check your email. We sent a link to change your password.', set_password:'Save password', pw_changed:'Password updated',
+  account_created:'Account created. Check your email and confirm your address. Then the administrator must approve it before you can get in.', waiting:'Your account is waiting for the administrator to approve it.',
+  sign_out:'Sign out', account:'My account', change_password:'Change password', users:'Users & access', pending:'Pending', approved_users:'Approved',
+  approve:'Approve', revoke:'Remove access', link_member:'Link to member', new_member_from:'Create a new member with this name',
+  sync_error:'Could not save online. Check your connection.', loading:'Loading...', online:'Online', offline_demo:'Demo mode (this phone only)',
+  login_failed:'Wrong email or password.', pw_short:'Password must be at least 8 characters.', connecting:'Connecting...',
+  months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+  days:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+}};
+const t = k => (T[S.lang] && T[S.lang][k]) ?? T.es[k] ?? k;
+const L = o => o ? (o[S.lang] ?? o.es ?? '') : '';   // pick language from an {es,en} object
+
+/* === DATA STORE ===
+   Everything lives in one object DB, saved to this phone's localStorage.
+   TO ADD A SHARED BACKEND LATER: replace loadDB()/saveDB() with calls to your service
+   (Supabase/Firebase/Sheets). Keep the same DB shape and nothing else needs to change. */
+const DB_KEY = 'nuevopacto.db.v1';
+const emptyDB = () => ({
+  members:[], households:[], children:[], posts:[], prayers:[], events:[], shifts:[],
+  attendance:{},   // key "YYYY-MM-DD|HH:MM" -> {present:[], confirmed:[], visitors:[]}
+  kids:[],         // check-in records
+  groups:[],       // {id,name,color,memberIds}
+  adminMsgs:[],    // private messages to the administrator
+  hymns:[], setlist:[], bible:{},  // bible: "YYYY-MM" -> {book, theme, teacher, weeks:[]}
+});
+let DB = emptyDB();
+function loadDB(){ try{ const raw=localStorage.getItem(DB_KEY); if(raw) DB=Object.assign(emptyDB(), JSON.parse(raw)); }catch(e){ console.warn('load failed',e); } }
+function saveLocal(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ toast('Storage full / Almacenamiento lleno'); } }
+function saveDB(){ saveLocal(); if(ONLINE && sb && PROFILE && PROFILE.approved) pushChanges(); }
+
+/* === ONLINE (Supabase) ===
+   Only active when CONFIG.supabase is filled in. Each DB collection maps to one table (id + data JSON).
+   saveDB() pushes only the rows that changed; realtime pulls other people's changes. */
+const ONLINE = !!(CONFIG.supabase.url && CONFIG.supabase.anonKey && !CONFIG.supabase.url.startsWith('__'));
+let sb=null, SESSION=null, PROFILE=null, SYNCED={}, PROFILES=[];
+const SYNC_MAP={
+  members:{table:'members'}, households:{table:'households'}, children:{table:'children'}, events:{table:'events'}, shifts:{table:'shifts'},
+  kids:{table:'kids_checkins'}, hymns:{table:'hymns'}, adminMsgs:{table:'admin_msgs'},
+  groups:{table:'groups',cols:r=>({member_ids:r.memberIds||[]})},
+  posts:{table:'posts',cols:r=>({group_id:r.groupId||null,author_member:r.authorId||null})},
+  prayers:{table:'prayers',cols:r=>({author_member:r.authorMemberId||null})},
+  attendance:{table:'attendance',keyed:true}, bible:{table:'bible',keyed:true},
+  setlist:{table:'settings',single:true},
+};
+function rowsOf(col){ const m=SYNC_MAP[col]; const v=DB[col];
+  if(m.single) return [{id:col,data:v}];
+  if(m.keyed) return Object.entries(v).map(([k,d])=>({id:k,data:d}));
+  return v.map(r=>({id:r.id,data:r,...(m.cols?m.cols(r):{})})); }
+function applyRows(col,rows){ const m=SYNC_MAP[col];
+  if(m.single){ const r=rows.find(x=>x.id===col); DB[col]=r?r.data:[]; }
+  else if(m.keyed){ DB[col]={}; rows.forEach(r=>DB[col][r.id]=r.data); }
+  else DB[col]=rows.map(r=>r.data);
+  SYNCED[col]={}; rowsOf(col).forEach(r=>SYNCED[col][r.id]=JSON.stringify(r)); }
+async function loadAll(){
+  const res=await Promise.all(Object.keys(SYNC_MAP).map(async col=>{ const {data,error}=await sb.from(SYNC_MAP[col].table).select('*'); if(error) throw error; return [col,data]; }));
+  res.forEach(([col,rows])=>applyRows(col,rows)); saveLocal(); }
+let pushing=false, pushAgain=false;
+async function pushChanges(){ if(pushing){ pushAgain=true; return; } pushing=true;
+  try{ for(const col of Object.keys(SYNC_MAP)){ const m=SYNC_MAP[col]; const rows=rowsOf(col); const prev=SYNCED[col]||{}; const now={}; const up=[];
+      rows.forEach(r=>{ const j=JSON.stringify(r); now[r.id]=j; if(prev[r.id]!==j) up.push(r); }); const del=Object.keys(prev).filter(id=>!(id in now));
+      if(up.length){ const {error}=await sb.from(m.table).upsert(up); if(error){ console.error(col,error); toast(t('sync_error')); continue; } }
+      if(del.length){ const {error}=await sb.from(m.table).delete().in('id',del); if(error){ console.error(col,error); toast(t('sync_error')); continue; } }
+      SYNCED[col]=now; } }
+  finally{ pushing=false; if(pushAgain){ pushAgain=false; pushChanges(); } } }
+let rtTimer=null;
+function subscribeRealtime(){ sb.channel('nuevopacto').on('postgres_changes',{event:'*',schema:'public'},()=>{ clearTimeout(rtTimer); rtTimer=setTimeout(async()=>{ if(pushing) return; try{ await loadAll(); if(can('admin')) await loadProfiles(); renderSoft(); }catch(e){ console.warn(e); } },500); }).subscribe(); }
+async function loadProfiles(){ const {data}=await sb.from('profiles').select('*').order('created_at'); PROFILES=data||[]; }
+async function initOnline(){
+  await new Promise((res,rej)=>{ const el=document.createElement('script'); el.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'; el.onload=res; el.onerror=rej; document.head.appendChild(el); });
+  sb=window.supabase.createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+  sb.auth.onAuthStateChange(async(ev,sess)=>{ SESSION=sess;
+    if(ev==='PASSWORD_RECOVERY'){ S.authMode='reset'; render(); return; }
+    if(sess){ await afterLogin(); } else { PROFILE=null; DB=emptyDB(); SYNCED={}; render(); } });
+}
+async function afterLogin(){ const {data}=await sb.from('profiles').select('*').eq('user_id',SESSION.user.id).maybeSingle(); PROFILE=data||null;
+  if(PROFILE&&PROFILE.approved){ try{ await loadAll(); if(can('admin')) await loadProfiles(); }catch(e){ console.error(e); toast(t('sync_error')); } if(!S.rt){ subscribeRealtime(); S.rt=true; } }
+  render(); }
+function renderSoft(){ const a=document.activeElement; if(a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT')&&a.value){ S.pendingRender=true; return; } if(document.getElementById('overlay').classList.contains('show')){ S.pendingRender=true; return; } render(); }
+document.addEventListener('focusout',()=>{ if(S.pendingRender){ S.pendingRender=false; setTimeout(()=>{ if(!document.getElementById('overlay').classList.contains('show')) render(); },150); } });
+const S = { lang:'es', theme:'light', view:'home', userId:null, tab:{}, calMonth:null, calSel:null, attDate:null, attTime:null, kidsGroup:'g1', search:'' };
+const S_KEY = 'nuevopacto.settings.v1';
+function loadS(){ try{ Object.assign(S, JSON.parse(localStorage.getItem(S_KEY)||'{}')); }catch(e){} }
+function saveS(){ localStorage.setItem(S_KEY, JSON.stringify({lang:S.lang, theme:S.theme, userId:S.userId})); }
+
+/* === DEMO DATA ===  Sample content so the first demo is not empty. Safe to delete this whole section later. */
+function loadDemo(){
+  DB = emptyDB();
+  const m=(first,last,role,ministry,phone,birth,hh)=>({id:uid(),first,last,role,ministry,phone,email:'',birthdate:birth,householdId:hh||null,notes:''});
+  const hhCardona=uid(), hhRamos=uid(), hhTorres=uid();
+  DB.members=[
+    m('Pastor','Cardona','pastor','Pastoral','661-555-0100','1970-05-12',hhCardona),
+    m('Pastora','Cardona','pastor','Pastoral','661-555-0101','1972-08-03',hhCardona),
+    m('Juan','Chinchilla','admin','Administración','661-555-0102','1985-02-20',hhRamos),
+    m('María','Chinchilla','teacher','Niños','661-555-0103','1987-11-15',hhRamos),
+    m('Luis','Torres','lead','Alabanza','661-555-0104','1990-06-30',hhTorres),
+    m('Ana','Torres','prayer','Oración','661-555-0105','1991-01-09',hhTorres),
+    m('Carlos','Mendoza','lead','Ujieres','661-555-0106','1978-03-22'),
+    m('Rosa','Hernández','member','','661-555-0107','1965-12-01'),
+    m('Pedro','García','member','Evangelismo','661-555-0108','1995-07-17'),
+    m('Lucía','Flores','teacher','Niños','661-555-0109','1998-09-25'),
+    m('Miguel','Santos','member','Jóvenes','661-555-0110','2004-04-04'),
+    m('Elena','Ruiz','member','Alabanza','661-555-0111','1983-10-10'),
+  ];
+  const byName=n=>DB.members.find(x=>x.first===n).id;
+  DB.households=[
+    {id:hhCardona,name:'Familia Cardona',parentIds:[byName('Pastor'),byName('Pastora')]},
+    {id:hhRamos,name:'Familia Chinchilla',parentIds:[byName('Juan'),byName('María')]},
+    {id:hhTorres,name:'Familia Torres',parentIds:[byName('Luis'),byName('Ana')]},
+  ];
+  DB.children=[
+    {id:uid(),householdId:hhRamos,name:'Sofía Chinchilla',birthdate:'2024-03-10',allergies:'',pickup:['Abuela Carmen']},
+    {id:uid(),householdId:hhRamos,name:'Diego Chinchilla',birthdate:'2020-08-22',allergies:'Cacahuate (maní)',pickup:['Abuela Carmen']},
+    {id:uid(),householdId:hhTorres,name:'Mateo Torres',birthdate:'2016-05-05',allergies:'',pickup:['Tío Roberto']},
+    {id:uid(),householdId:hhTorres,name:'Valeria Torres',birthdate:'2013-01-30',allergies:'Lácteos',pickup:['Tío Roberto']},
+  ];
+  DB.groups=[
+    {id:uid(),name:'Alabanza',color:'gold',memberIds:[byName('Luis'),byName('Elena')]},
+    {id:uid(),name:'Ujieres',color:'red',memberIds:[byName('Carlos'),byName('Pedro')]},
+    {id:uid(),name:'Oración',color:'purple',memberIds:[byName('Ana'),byName('Pastora')]},
+    {id:uid(),name:'Niños',color:'blue',memberIds:[byName('María'),byName('Lucía')]},
+    {id:uid(),name:'Jóvenes',color:'purple',memberIds:[byName('Miguel')]},
+  ];
+  const now=Date.now();
+  DB.adminMsgs=[{id:uid(),fromId:byName('Pastor'),fromName:'Pastor Cardona',text:'Juan, por favor dale acceso de maestra a Lucía.',at:now-3600e3*8,read:false}];
+  DB.posts=[
+    {id:uid(),authorId:byName('Pastor'),authorName:'Pastor Cardona',isPastor:true,pinned:true,createdAt:now-3600e3*5,
+     text:'Bendiciones familia. Este domingo tendremos un tiempo especial de oración por las familias en ambos servicios. Traigan a sus seres queridos.',
+     text2:'Blessings family. This Sunday we will have a special time of prayer for families in both services. Bring your loved ones.',lang:'es',
+     photo:null,reactions:{amen:[byName('Juan'),byName('Rosa')],heart:[byName('Ana')]},comments:[{name:'Rosa Hernández',text:'¡Amén pastor!',at:now-3600e3*4}]},
+    {id:uid(),authorId:byName('Luis'),authorName:'Luis Torres',isPastor:false,pinned:false,createdAt:now-3600e3*20,groupId:DB.groups[0].id,
+     text:'Equipo de alabanza: ensayo el jueves a las 7pm. Por favor confirmen.',photo:null,reactions:{amen:[],heart:[byName('Elena')]},comments:[]},
+    {id:uid(),authorId:byName('Carlos'),authorName:'Carlos Mendoza',isPastor:false,pinned:false,createdAt:now-3600e3*50,
+     text:'Necesitamos 2 ujieres más para el servicio de las 4pm. Avísenme.',photo:null,reactions:{amen:[],heart:[]},comments:[]},
+  ];
+  DB.prayers=[{id:uid(),name:'Rosa Hernández',text:'Por la salud de mi esposo.',createdAt:now-86400e3,answered:false},
+              {id:uid(),name:'Anónimo',text:'Por trabajo.',createdAt:now-86400e3*3,answered:false}];
+  const ymd=d=>d.toISOString().slice(0,10);
+  const d1=new Date(); d1.setDate(d1.getDate()+9);
+  DB.events=[{id:uid(),title:'Noche de Jóvenes: Fogata',date:ymd(d1),time:'18:30',place:'Patio de la iglesia',details:'Traer sudadera. Habrá cena.',ministry:'Jóvenes',color:'purple',rsvp:[byName('Miguel')]}];
+  DB.shifts=[{id:uid(),date:nextService().date,time:nextService().time,ministry:'Ujieres',memberIds:[byName('Carlos'),byName('Pedro')]}];
+  DB.children[2].classId='g2'; // demo: Mateo kept with the 4-7 class by choice
+  DB.hymns=[{id:uid(),title:'Cuán Grande Es Él',key:'G',photo:null,lyrics:'[G]Señor mi Dios, al con[C]templar los [G]cielos\nEl firma[D]mento y las es[G]trellas mil',tags:'adoración',createdAt:now},
+            {id:uid(),title:'Renuévame',key:'D',photo:null,lyrics:'',tags:'',createdAt:now}];
+  DB.setlist=[DB.hymns[0].id];
+  const ym=new Date().toISOString().slice(0,7);
+  const w=(off,p)=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1+off*7);return {date:ymd(d),passage:p,teacher:'Pastor Cardona',notes:''};};
+  DB.bible={[ym]:{book:'1 Corintios',theme:'Una iglesia unida en Cristo',teacher:'Pastor Cardona',weeks:[w(-1,'1 Corintios 1-2'),w(0,'1 Corintios 3-4'),w(1,'1 Corintios 5-6'),w(2,'1 Corintios 7-8')]}};
+  // a few weeks of attendance history
+  const ids=DB.members.map(x=>x.id);
+  for(let k=1;k<=5;k++){ const d=new Date(); d.setDate(d.getDate()-d.getDay()-7*(k-1)); const key=ymd(d)+'|12:00';
+    DB.attendance[key]={present:ids.filter((_,i)=> (i+k)%4!==0 && !(k<4 && i===7)),confirmed:[],visitors:k===1?[{name:'Familia Nueva',phone:''}]:[]}; }
+  S.userId=byName('Pastor'); saveS(); saveDB();
+}
+
+/* === HELPERS === */
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayYMD=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const toYMD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const parseYMD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+function fmtDate(ymd,long){ const d=parseYMD(ymd); const m=t('months')[d.getMonth()]; const w=t('days')[d.getDay()];
+  return S.lang==='es' ? `${long?w+' ':''}${d.getDate()} de ${m}` : `${long?w+', ':''}${m} ${d.getDate()}`; }
+const fmt12=hm=>{let [h,m]=hm.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return `${h}:${String(m).padStart(2,'0')}${ap}`;};
+const ago=ms=>{const h=Math.floor((Date.now()-ms)/3600e3);if(h<1)return S.lang==='es'?'ahora':'now';if(h<24)return h+'h';return Math.floor(h/24)+'d';};
+function ageOf(b){ if(!b)return null; const d=parseYMD(b),n=new Date(); let a=n.getFullYear()-d.getFullYear(); if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))a--; return a; }
+function groupOf(child){ if(child.classId) return child.classId; const a=ageOf(child.birthdate)??0; return (CONFIG.ageGroups.find(g=>a>=g.min&&a<=g.max)||CONFIG.ageGroups[CONFIG.ageGroups.length-1]).id; }
+const me=()=>ONLINE ? (PROFILE&&PROFILE.member_id ? DB.members.find(m=>m.id===PROFILE.member_id)||null : null) : (DB.members.find(m=>m.id===S.userId)||null);
+function can(p){ if(ONLINE){ if(!PROFILE||!PROFILE.approved) return false; return (CONFIG.roles[PROFILE.role]?.can||[]).includes(p); } const u=me(); if(!u) return false; return (CONFIG.roles[u.role]?.can||[]).includes(p); }
+const myGroups=()=>{const u=me(); return DB.groups.filter(g=>u&&(g.memberIds.includes(u.id)||can('admin')));};
+const inGroup=g=>{const u=me(); return !!u&&(g.memberIds.includes(u.id)||can('admin'));};
+const postText=p=>(p.text2&&p.lang&&p.lang!==S.lang)?p.text2:p.text;
+function chordSheet(src){ // "[D]El firma[G]mento" -> chords on the line above the words
+  return src.split('\n').map(line=>{ if(!/\[[^\]]+\]/.test(line)) return `<div>${esc(line)||'&nbsp;'}</div>`;
+    let ch='',ly=''; line.split(/(\[[^\]]+\])/).forEach(part=>{ if(/^\[.*\]$/.test(part)){ while(ch.length<ly.length) ch+=' '; ch+=part.slice(1,-1)+' '; } else { ly+=part; } });
+    while(ly.length<ch.length) ly+=' '; return `<div class="chordline">${esc(ch)}</div><div>${esc(ly)}</div>`; }).join(''); }
+const unreadAdmin=()=>can('admin')?DB.adminMsgs.filter(m=>!m.read).length:0;
+const fullName=m=>m?`${m.first} ${m.last}`.trim():'';
+const initials=m=>((m.first||'?')[0]+(m.last||' ')[0]).toUpperCase();
+// Weekly events that fall on a given date (YYYY-MM-DD)
+function weeklyOn(ymd){ const d=parseYMD(ymd); const nth=Math.ceil(d.getDate()/7);
+  return CONFIG.weekly.filter(w=>w.dow===d.getDay() && (!w.nth || w.nth===nth)).map(w=>({...w,date:ymd,title:L(w),weekly:true})); }
+function eventsOn(ymd){ return [...weeklyOn(ymd), ...DB.events.filter(e=>e.date===ymd).map(e=>({...e,color:e.color||'o'}))].sort((a,b)=>a.time.localeCompare(b.time)); }
+function servicesOn(ymd){ return weeklyOn(ymd).filter(w=>w.kind==='service'); }
+function nextService(){ const now=new Date(); for(let i=0;i<8;i++){ const d=new Date(now); d.setDate(d.getDate()+i); const y=toYMD(d);
+  for(const s of servicesOn(y)){ const end=new Date(d); const [h,m]=s.time.split(':'); end.setHours(+h+2,+m); if(end>now) return {date:y,time:s.time,title:s.title}; } } return null; }
+function lastServices(n){ const out=[]; const d=new Date(); for(let i=0;out.length<n && i<120;i++){ const y=toYMD(d); const ss=servicesOn(y).reverse();
+  for(const s of ss){ if(new Date(y+'T'+s.time)<=new Date()) out.push({date:y,time:s.time}); } d.setDate(d.getDate()-1);} return out.slice(0,n); }
+const attKey=(d,tm)=>d+'|'+tm;
+function att(d,tm){ const k=attKey(d,tm); if(!DB.attendance[k]) DB.attendance[k]={present:[],confirmed:[],visitors:[]}; return DB.attendance[k]; }
+function sure(key){ if(S._sure===key&&Date.now()-S._sureAt<3000){S._sure=null;return true;} S._sure=key;S._sureAt=Date.now(); toast(S.lang==='es'?'Toca otra vez para confirmar':'Tap again to confirm'); return false; }
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1800); }
+function shrinkImage(file,cb){ const img=new Image(); img.onload=()=>{ const max=CONFIG.maxPhotoPx; let w=img.width,h=img.height; const r=Math.min(1,max/Math.max(w,h)); w=Math.round(w*r);h=Math.round(h*r);
+  const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',.82)); }; img.src=URL.createObjectURL(file); }
+function download(name,text,type='application/json'){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); }
+const sel=(opts,val,empty)=>(empty?`<option value="">${esc(empty)}</option>`:'')+opts.map(o=>`<option value="${esc(o.v)}" ${o.v===val?'selected':''}>${esc(o.l)}</option>`).join('');
+
+/* === VIEWS === */
+function render(){
+  document.documentElement.setAttribute('data-theme',S.theme); document.documentElement.lang=S.lang;
+  document.getElementById('themeBtn').textContent=S.theme==='dark'?'☀️':'🌙';
+  document.getElementById('l-es').className=S.lang==='es'?'on':''; document.getElementById('l-en').className=S.lang==='en'?'on':'';
+  if(ONLINE){ let gate=null; if(!sb) gate=`<div class="empty">${t('connecting')}</div>`; else if(!SESSION||S.authMode==='reset') gate=viewAuth(); else if(!PROFILE||!PROFILE.approved) gate=viewWait();
+    if(gate){ document.getElementById('main').innerHTML=gate; document.getElementById('nav').innerHTML=''; document.getElementById('nav').style.display='none'; return; } document.getElementById('nav').style.display='flex'; }
+  const views={home:viewHome,cal:viewCal,att:viewAtt,kids:viewKids,more:viewMore,hymns:viewHymns,bible:viewBible,prayer:viewPrayer,members:viewMembers,settings:viewSettings,groups:viewGroups,group:viewGroup,adminmsg:viewAdminMsg,users:viewUsers};
+  document.getElementById('main').innerHTML=(views[S.view]||viewHome)();
+  const navItems=[['home','🏠',t('nav_home')],['cal','📅',t('nav_cal')],['att','✅',t('nav_att')],['kids','🧒',t('nav_kids')],['more','☰',t('nav_more')]];
+  const moreViews=['more','hymns','bible','prayer','members','settings','groups','group','adminmsg','users'];
+  document.getElementById('nav').innerHTML=navItems.map(([v,ic,l])=>`<button class="${(S.view===v||(v==='more'&&moreViews.includes(S.view)))?'on':''}" onclick="A.go('${v}')"><span class="ic">${ic}</span>${l}</button>`).join('');
+  window.scrollTo(0,0);
+}
+function userBanner(){ const u=me(); return `<div class="muted" style="margin-bottom:10px">${t('logged_as')}: <b>${esc(fullName(u))||'—'}</b> <a href="#" onclick="A.go('settings');return false">(${t('edit')})</a></div>`; }
+
+function authShell(inner){ return `<div style="max-width:420px;margin:30px auto"><div style="text-align:center;margin-bottom:16px"><img src="${document.getElementById('logo').src}" style="width:120px;border-radius:24px"></div><div class="card">${inner}</div>
+  <div class="hint" style="text-align:center">${t('online')} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div></div>`; }
+function viewAuth(){ const m=S.authMode||'login';
+  if(m==='signup') return authShell(`<h2>${t('sign_up')}</h2><label class="f">${t('your_name')}</label><input type="text" id="au-name"><label class="f">${t('email')}</label><input type="email" id="au-email" autocomplete="email"><label class="f">${t('password')}</label><input type="password" id="au-pw" autocomplete="new-password">
+    <button class="btn p block" onclick="A.signup()">${t('create_account')}</button><button class="btn ghost block" style="margin-top:8px" onclick="S.authMode='login';render()">${t('back_to_login')}</button>`);
+  if(m==='forgot') return authShell(`<h2>${t('forgot')}</h2><label class="f">${t('email')}</label><input type="email" id="au-email" autocomplete="email"><button class="btn p block" onclick="A.forgot()">${t('send_reset')}</button><button class="btn ghost block" style="margin-top:8px" onclick="S.authMode='login';render()">${t('back_to_login')}</button>`);
+  if(m==='reset') return authShell(`<h2>${t('new_password')}</h2><input type="password" id="au-pw" autocomplete="new-password"><button class="btn p block" onclick="A.resetPw()">${t('set_password')}</button>`);
+  if(m==='created') return authShell(`<div class="empty">✅ ${t('account_created')}</div><button class="btn ghost block" onclick="S.authMode='login';render()">${t('back_to_login')}</button>`);
+  return authShell(`<h2>${t('sign_in')}</h2><label class="f">${t('email')}</label><input type="email" id="au-email" autocomplete="email"><label class="f">${t('password')}</label><input type="password" id="au-pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')A.login()">
+    <button class="btn y block" onclick="A.login()">${t('sign_in')}</button><div class="row" style="margin-top:10px"><button class="btn ghost grow" onclick="S.authMode='signup';render()">${t('sign_up')}</button><button class="btn ghost grow" onclick="S.authMode='forgot';render()">${t('forgot')}</button></div>`);
+}
+function viewWait(){ return authShell(`<div class="empty">⏳ ${t('waiting')}<br><br><span class="muted">${esc(SESSION?.user?.email||'')}</span></div><button class="btn ghost block" onclick="A.logout()">${t('sign_out')}</button>`); }
+function viewUsers(){ if(!can('admin')) return `<div class="card muted">${t('no_permission')}</div>`;
+  const pend=PROFILES.filter(p=>!p.approved), ok=PROFILES.filter(p=>p.approved); const roleOpts=Object.keys(CONFIG.roles).map(r=>({v:r,l:L(CONFIG.roles[r])}));
+  const memOpts=[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>({v:m.id,l:fullName(m)}));
+  const linkedBy=id=>PROFILES.find(p=>p.member_id===id);
+  const row=(p,pending)=>`<div class="card ${pending?'accent-red':''}"><b>${esc(p.display_name||'—')}</b> <span class="muted">${esc(p.email||'')}</span>
+    <label class="f">${t('role')}</label><select id="ur-${p.user_id}" onchange="${pending?'':`A.setUserRole('${p.user_id}',this.value)`}">${sel(roleOpts,p.role)}</select>
+    <label class="f">${t('link_member')}</label><select id="um-${p.user_id}">${sel(memOpts,p.member_id||'',t('new_member_from'))}</select>
+    <div class="row">${pending?`<button class="btn g grow" onclick="A.approve('${p.user_id}')">✓ ${t('approve')}</button>`:`<button class="btn sm ghost" onclick="A.relink('${p.user_id}')">${t('save')}</button><button class="btn sm r right" onclick="A.revoke('${p.user_id}')">${t('revoke')}</button>`}</div></div>`;
+  return `<h2>${t('users')}</h2><h3>${t('pending')} <span class="chip red">${pend.length}</span></h3>${pend.map(p=>row(p,true)).join('')||`<div class="empty">${t('none')}</div>`}
+    <h3 style="margin-top:16px">${t('approved_users')} <span class="chip">${ok.length}</span></h3>${ok.map(p=>row(p,false)).join('')}`; }
+function viewHome(){
+  const ns=nextService(); const u=me(); let h='';
+  if(ns){ const a=att(ns.date,ns.time); const on=u&&a.confirmed.includes(u.id);
+    h+=`<div class="card accent-red"><div class="muted">${t('next_service')}</div><h2>${esc(ns.title)}</h2><div>${fmtDate(ns.date,true)} · ${fmt12(ns.time)}</div>
+      <div class="row" style="margin-top:10px"><button class="btn ${on?'g':'y'}" onclick="A.confirmMe('${ns.date}','${ns.time}')">${on?'✓ '+t('confirmed'):t('confirm_me')}</button><span class="muted">${a.confirmed.length} ${t('confirmed_n')}</span></div></div>`; }
+  if(u){ const soon=DB.shifts.filter(s=>s.memberIds.includes(u.id) && s.date>=todayYMD()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,2);
+    for(const s of soon) h+=`<div class="card accent-gold"><b>⭐ ${t('serving')}</b><div>${esc(s.ministry)} · ${fmtDate(s.date,true)} ${fmt12(s.time)}</div></div>`; }
+  h+=`<h2>${t('bulletin')}</h2>
+  <div class="card">${composeBox('')}
+    <div class="row wrap"><label class="btn ghost sm">📷 ${t('photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'newPostPhoto')"></label>
+    ${can('pastorPost')?`<label class="chip"><input type="checkbox" id="asPastor"> ${t('pastor_msg')}</label><label class="chip"><input type="checkbox" id="pinPost"> ${t('pin')}</label>`:''}
+    <button class="btn p right" onclick="A.addPost('')">${t('post')}</button></div><div id="newPostPhoto"></div></div>`;
+  const posts=DB.posts.filter(p=>!p.groupId).sort((a,b)=>(b.pinned-a.pinned)||(b.createdAt-a.createdAt));
+  if(!posts.length) h+=`<div class="empty">${t('none')}</div>`;
+  for(const p of posts) h+=postCard(p);
+  return h;
+}
+function composeBox(groupId){ const other=S.lang==='es'?'en':'es';
+  return `<textarea id="newPost" placeholder="${groupId?t('write_group_post'):t('write_post')}"></textarea>
+  <div id="post2wrap" style="display:none"><textarea id="newPost2" placeholder="${other==='en'?'English version...':'Versión en español...'}"></textarea><div class="hint">${t('second_lang_hint')}</div></div>
+  <button class="btn ghost sm" style="margin-bottom:8px" onclick="const w=document.getElementById('post2wrap');w.style.display=w.style.display==='none'?'block':'none'">🌐 ${other==='en'?t('add_english'):t('add_spanish')}</button>`; }
+function postCard(p){ const u=me(); const r=p.reactions||{amen:[],heart:[]}; const mine=k=>u&&r[k].includes(u.id);
+  const own=u&&(u.id===p.authorId||can('edit'));
+  return `<div class="card post ${p.isPastor?'pastor':''}"><div class="meta"><div class="avatar ${p.isPastor?'gold':''}">${esc(initials({first:p.authorName.split(' ')[0],last:p.authorName.split(' ')[1]||''}))}</div>
+    <div class="grow"><b>${esc(p.authorName)}</b>${p.isPastor?` <span class="chip gold">✝ ${t('pastor_msg')}</span>`:''}${p.pinned?' 📌':''}<div class="muted">${ago(p.createdAt)}</div></div>
+    ${own?`<button class="icon-btn" style="background:transparent;color:inherit" onclick="A.delPost('${p.id}')">🗑</button>`:''}</div>
+    <div style="white-space:pre-wrap">${esc(postText(p))}</div>${p.photo?`<img class="photo" src="${p.photo}" onclick="A.viewPhoto('${p.id}')">`:''}
+    <div class="row wrap" style="margin-top:10px"><button class="react ${mine('amen')?'on':''}" onclick="A.react('${p.id}','amen')">🙏 ${t('amen')} ${r.amen.length||''}</button>
+    <button class="react ${mine('heart')?'on':''}" onclick="A.react('${p.id}','heart')">❤️ ${r.heart.length||''}</button>
+    ${(p.text2&&p.lang!==S.lang)?'':`<a class="react" style="text-decoration:none;color:inherit" target="_blank" href="https://translate.google.com/?sl=auto&tl=${S.lang}&text=${encodeURIComponent(p.text)}&op=translate">🌐 ${t('translate')}</a>`}</div>
+    <div style="margin-top:8px">${(p.comments||[]).map(c=>`<div class="comment"><b>${esc(c.name)}</b> <span class="muted">${ago(c.at)}</span><br>${esc(c.text)}</div>`).join('')}
+    <div class="row" style="margin-top:6px"><input type="text" id="c-${p.id}" placeholder="${t('write_comment')}" style="margin:0"><button class="btn sm" onclick="A.comment('${p.id}')">${t('send')}</button></div></div></div>`; }
+
+function viewCal(){
+  if(!S.calMonth) S.calMonth=todayYMD().slice(0,7); if(!S.calSel) S.calSel=todayYMD();
+  const [y,m]=S.calMonth.split('-').map(Number); const first=new Date(y,m-1,1); const start=(first.getDay()+6)%7; // Monday first
+  const dim=new Date(y,m,0).getDate(); const cells=[]; for(let i=0;i<start;i++)cells.push(null); for(let d=1;d<=dim;d++)cells.push(toYMD(new Date(y,m-1,d)));
+  let h=`<div class="row" style="margin-bottom:8px"><button class="btn sm" onclick="A.calMove(-1)">‹</button><h2 class="grow" style="text-align:center;margin:0">${t('months')[m-1]} ${y}</h2><button class="btn sm" onclick="A.calMove(1)">›</button></div>
+  <div class="cal">${['day_mon','day_tue','day_wed','day_thu','day_fri','day_sat','day_sun'].map(k=>`<div class="dh">${t(k)}</div>`).join('')}
+  ${cells.map(c=>c?`<div class="d ${c===todayYMD()?'today':''} ${c===S.calSel?'sel':''}" onclick="A.calPick('${c}')">${+c.slice(8)}<div class="dots">${[...new Set(eventsOn(c).map(e=>e.color))].slice(0,4).map(cl=>`<span class="dot ${cl}"></span>`).join('')}</div></div>`:'<div></div>').join('')}</div>
+  <div class="row" style="margin:14px 0 8px"><h3 style="margin:0" class="grow">${t('events_on')} ${fmtDate(S.calSel,true)}</h3>${can('edit')?`<button class="btn sm p" onclick="A.eventForm()">＋ ${t('add_event')}</button>`:''}</div>`;
+  const evs=eventsOn(S.calSel); if(!evs.length) h+=`<div class="empty">${t('none')}</div>`;
+  const u=me();
+  for(const e of evs){ const going=e.rsvp||[]; const on=u&&going.includes(u.id);
+    h+=`<div class="card accent-${e.color}"><div class="row"><div class="grow"><b>${esc(e.title)}</b><div class="muted">${fmt12(e.time)}${e.place?' · '+esc(e.place):''}${e.weekly?' · '+t('weekly_event'):''}</div>${e.details?`<div style="margin-top:4px">${esc(e.details)}</div>`:''}</div>
+      ${!e.weekly&&can('edit')?`<button class="btn sm ghost" onclick="A.eventForm('${e.id}')">✎</button>`:''}</div>
+      <div class="row wrap" style="margin-top:8px">${!e.weekly?`<button class="btn sm ${on?'g':'y'}" onclick="A.rsvp('${e.id}')">${on?'✓ ':''}${t('rsvp')}</button><span class="muted">${going.length} ${t('going')}</span>`:''}
+      <button class="btn sm ghost right" onclick="A.ics('${e.date}','${e.time}','${esc(e.title)}','${esc(e.place||'')}')">📲 ${t('add_to_phone')}</button></div></div>`; }
+  return h;
+}
+
+function viewAtt(){
+  const tab=S.tab.att||'mark'; const ns=nextService(); if(!S.attDate){ const last=lastServices(1)[0]||ns; S.attDate=last.date; S.attTime=last.time; }
+  let h=`<h2>${t('nav_att')}</h2><div class="tabs">${[['mark',t('mark_attendance')],['reports',t('reports')],['shifts',t('shifts')]].map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="A.tab('att','${k}')">${l}</button>`).join('')}</div>`;
+  if(tab==='mark'){
+    const ss=servicesOn(S.attDate);
+    h+=`<div class="card"><label class="f">${t('date')}</label><input type="date" value="${S.attDate}" onchange="A.attDate(this.value)">
+      <label class="f">${t('service')}</label><select onchange="S.attTime=this.value;render()">${sel(ss.map(s=>({v:s.time,l:fmt12(s.time)+' · '+s.title})),S.attTime)}</select>`;
+    if(!ss.length){ h+=`<div class="muted">${t('no_service')}</div></div>`; return h; }
+    if(!ss.find(s=>s.time===S.attTime)) S.attTime=ss[0].time;
+    const a=att(S.attDate,S.attTime); const canMark=can('attendance');
+    h+=`<div class="row"><span class="chip green">${t('present')}: ${a.present.length+a.visitors.length}</span><span class="chip">${t('confirmed')}: ${a.confirmed.length}</span>
+      ${canMark?`<button class="btn sm ghost right" onclick="A.visitorForm()">＋ ${t('add_visitor')}</button>`:''}</div></div>
+      <input type="search" placeholder="${t('search')}" value="${esc(S.search)}" oninput="S.search=this.value;A.rerenderList()">
+      ${canMark?`<div class="hint">${t('mark_by_tap')}</div>`:''}<div class="card list" id="attList">${attList()}</div>`;
+  } else if(tab==='reports'){
+    const rt=S.tab.rep||'summary';
+    h+=`<div class="tabs">${[['summary',t('summary')],['followup',t('followup')],['history',t('history')]].map(([k,l])=>`<button class="${rt===k?'on':''}" onclick="A.tab('rep','${k}')">${l}</button>`).join('')}</div>`;
+    if(rt==='summary'){ const ls=lastServices(8).reverse(); const max=Math.max(1,...ls.map(s=>{const a=DB.attendance[attKey(s.date,s.time)];return a?a.present.length+a.visitors.length:0;}));
+      h+=`<div class="card"><h3>${t('last_services')}</h3><div class="bar-row" style="margin:24px 4px 22px">${ls.map(s=>{const a=DB.attendance[attKey(s.date,s.time)];const n=a?a.present.length+a.visitors.length:0;return `<div style="height:${Math.round(n/max*100)}%"><span>${n}</span><small>${s.date.slice(5).replace('-','/')}<br>${fmt12(s.time)}</small></div>`;}).join('')}</div></div>`;
+      h+=`<div class="card"><div class="muted">${t('members')}: <b>${DB.members.length}</b> · ${t('children')}: <b>${DB.children.length}</b> · ${t('households')}: <b>${DB.households.length}</b></div></div>`; }
+    if(rt==='followup'){ const cutoff=lastServices(CONFIG.followUpWeeks*3); const seen=new Set(); cutoff.forEach(s=>(DB.attendance[attKey(s.date,s.time)]?.present||[]).forEach(id=>seen.add(id)));
+      const missing=DB.members.filter(m=>!seen.has(m.id)); h+=`<div class="card"><h3>${t('not_seen')} ${CONFIG.followUpWeeks} ${t('weeks')}</h3><div class="list">${missing.length?missing.map(m=>`<div class="item"><div class="avatar blue">${initials(m)}</div><div class="grow"><b>${esc(fullName(m))}</b><div class="muted">${esc(m.phone||'')}</div></div>${m.phone?`<a class="btn sm" href="tel:${esc(m.phone)}">📞</a><a class="btn sm" href="sms:${esc(m.phone)}">💬</a>`:''}</div>`).join(''):`<div class="empty">🎉 ${t('none')}</div>`}</div></div>`; }
+    if(rt==='history'){ const id=S.tab.histId||''; const m=DB.members.find(x=>x.id===id);
+      h+=`<div class="card"><label class="f">${t('pick_person')}</label><select onchange="S.tab.histId=this.value;render()">${sel(DB.members.map(x=>({v:x.id,l:fullName(x)})),id,'—')}</select>`;
+      if(m){ const keys=Object.keys(DB.attendance).filter(k=>DB.attendance[k].present.includes(id)).sort().reverse(); h+=`<div class="chip green">${keys.length} ${t('services_attended')}</div><div class="list">${keys.slice(0,30).map(k=>{const [d,tm]=k.split('|');return `<div class="item">✓ ${fmtDate(d,true)} · ${fmt12(tm)}</div>`;}).join('')}</div>`; }
+      h+='</div>'; }
+  } else {
+    const up=DB.shifts.filter(s=>s.date>=todayYMD()).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    h+=`<div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">${t('shifts')}</h3>${can('edit')?`<button class="btn sm p" onclick="A.shiftForm()">＋ ${t('add_shift')}</button>`:''}</div>`;
+    if(!up.length) h+=`<div class="empty">${t('none')}</div>`;
+    for(const s of up) h+=`<div class="card accent-gold"><div class="row"><div class="grow"><b>${esc(s.ministry)}</b><div class="muted">${fmtDate(s.date,true)} · ${fmt12(s.time)}</div><div>${s.memberIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')}</div></div>${can('edit')?`<button class="btn sm ghost" onclick="A.shiftForm('${s.id}')">✎</button>`:''}</div></div>`;
+  }
+  return h;
+}
+function attList(){ const a=att(S.attDate,S.attTime); const q=S.search.toLowerCase(); const canMark=can('attendance');
+  const ms=DB.members.filter(m=>fullName(m).toLowerCase().includes(q)).sort((x,y)=>fullName(x).localeCompare(fullName(y)));
+  return ms.map(m=>{const on=a.present.includes(m.id);const c=a.confirmed.includes(m.id);
+    return `<div class="item" ${canMark?`onclick="A.markPresent('${m.id}')"`:''}><div class="toggle ${on?'on':''}">${on?'✓':''}</div><div class="grow"><b>${esc(fullName(m))}</b><div class="muted">${esc(m.ministry||'')}${c?' · ✓ '+t('confirmed'):''}</div></div></div>`;}).join('')
+  + a.visitors.map((v,i)=>`<div class="item"><div class="toggle on">✓</div><div class="grow"><b>${esc(v.name)}</b> <span class="chip">${t('visitor')}</span><div class="muted">${esc(v.phone||'')}</div></div>${canMark?`<button class="btn sm ghost" onclick="A.delVisitor(${i})">✕</button>`:''}</div>`).join('');
+}
+
+function viewKids(){
+  if(!can('kids')){ return `<h2>${t('kids_checkin')}</h2>${userBanner()}<div class="card"><div class="muted">${t('no_permission')}</div></div>`+myKidsCard(); }
+  const ns=nextService(); const last=lastServices(1)[0]; const cur=S.kidsSvc||(ns&&ns.date===todayYMD()?ns:(last||ns)); S.kidsSvc=cur;
+  const ss=servicesOn(cur.date); const key=attKey(cur.date,cur.time);
+  let h=`<h2>${t('kids_checkin')}</h2><div class="card"><div class="row"><div class="grow"><label class="f">${t('date')}</label><input type="date" value="${cur.date}" onchange="A.kidsDate(this.value)"></div>
+    <div class="grow"><label class="f">${t('service')}</label><select onchange="S.kidsSvc={...S.kidsSvc,time:this.value};render()">${sel(ss.map(s=>({v:s.time,l:fmt12(s.time)})),cur.time)}</select></div></div></div>`;
+  if(!ss.length) return h+`<div class="empty">${t('no_service')}</div>`;
+  h+=`<div class="tabs">${CONFIG.ageGroups.map(g=>`<button class="${S.kidsGroup===g.id?'on':''}" onclick="S.kidsGroup='${g.id}';render()">${L(g)}</button>`).join('')}</div>`;
+  const kids=DB.children.filter(c=>groupOf(c)===S.kidsGroup).sort((a,b)=>a.name.localeCompare(b.name));
+  const recs=DB.kids.filter(r=>r.serviceKey===key); const inNow=kids.filter(c=>{const r=recs.find(x=>x.childId===c.id);return r&&!r.checkOutAt;}).length;
+  h+=`<div class="row" style="margin-bottom:8px"><span class="chip green">${inNow} ${t('in_class')}</span><button class="btn sm ghost right" onclick="A.childForm('','')">＋ ${t('add_kid_here')}</button></div><div class="card list">`;
+  if(!kids.length) h+=`<div class="empty">${t('no_kids')}</div>`;
+  for(const c of kids){ const r=recs.find(x=>x.childId===c.id); const st=!r?'none':(r.checkOutAt?'out':'in'); const hh=DB.households.find(x=>x.id===c.householdId);
+    h+=`<div class="item"><div class="avatar ${st==='in'?'':'blue'}" style="${st==='in'?'background:#2e7d32':''}">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b> <span class="muted">${ageOf(c.birthdate)} ${t('age')}</span>
+      <div class="muted">${esc(hh?hh.name:'')}${r?` · ${t('checkin')} ${new Date(r.checkInAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} (${esc(r.droppedBy)})`:''}${r&&r.checkOutAt?` · ${t('checkout')} (${esc(r.pickedUpBy)})`:''}</div>
+      ${c.allergies?`<span class="allergy">⚠ ${esc(c.allergies)}</span>`:''}</div>
+      ${st==='none'?`<button class="btn sm g" onclick="A.kidIn('${c.id}')">${t('checkin')}</button>`:st==='in'?`<button class="btn sm r" onclick="A.kidOut('${c.id}')">${t('checkout')}</button>`:`<span class="chip">${t('out_now')}</span>`}</div>`; }
+  return h+'</div>';
+}
+function myKidsCard(){ const u=me(); if(!u||!u.householdId) return ''; const kids=DB.children.filter(c=>c.householdId===u.householdId); if(!kids.length) return '';
+  return `<div class="card"><h3>${t('children')}</h3><div class="list">${kids.map(c=>{const r=[...DB.kids].reverse().find(x=>x.childId===c.id);const g=CONFIG.ageGroups.find(g=>g.id===groupOf(c));
+    return `<div class="item"><div class="avatar">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b><div class="muted">${L(g)}${r?` · ${r.checkOutAt?t('out_now'):t('in_now')}`:''}</div></div></div>`;}).join('')}</div></div>`; }
+
+function viewMore(){
+  const n=unreadAdmin();
+  const items=[['groups','👥',t('groups')],['hymns','🎵',t('hymns')],['bible','📖',t('bible')],['prayer','🙏',t('prayer')],['adminmsg','✉️',(can('admin')?t('admin_inbox'):t('msg_admin'))+(n?`<span class="badge">${n}</span>`:'')],['members','📋',t('members')],...(ONLINE&&can('admin')?[['users','🔑',t('users')+(PROFILES.filter(p=>!p.approved).length?`<span class="badge">${PROFILES.filter(p=>!p.approved).length}</span>`:'')]]:[]),['settings','⚙️',t('settings')]];
+  return `<h2>${t('nav_more')}</h2>${userBanner()}<div class="grid2">${items.map(([v,ic,l])=>`<div class="big" onclick="A.go('${v}')"><span class="ic">${ic}</span>${l}</div>`).join('')}
+    <a class="big" href="${CONFIG.facebook}" target="_blank" style="text-decoration:none;color:inherit"><span class="ic">📘</span>${t('facebook')}</a></div>`;
+}
+
+function viewGroups(){
+  const gs=myGroups(); const ed=can('admin')||can('edit');
+  return `<div class="row"><h2 class="grow">${t('my_groups')}</h2>${ed?`<button class="btn sm p" onclick="A.groupForm()">＋ ${t('new_group')}</button>`:''}</div>
+  ${gs.length?gs.map(g=>`<div class="card accent-${g.color||'blue'}" onclick="S.groupId='${g.id}';A.go('group')"><div class="row"><div class="grow"><b>${esc(g.name)}</b><div class="muted">${g.memberIds.length} ${t('group_members').toLowerCase()} · ${DB.posts.filter(p=>p.groupId===g.id).length} ${t('bulletin').toLowerCase()}</div></div><span>›</span></div></div>`).join(''):`<div class="empty">${t('none')}</div>`}
+  ${!can('admin')&&DB.groups.length>gs.length?`<div class="muted">${t('only_members')}</div>`:''}`;
+}
+function viewGroup(){
+  const g=DB.groups.find(x=>x.id===S.groupId); if(!g) return viewGroups();
+  let h=`<div class="row"><button class="btn sm ghost" onclick="A.go('groups')">‹</button><h2 class="grow" style="margin:0">${esc(g.name)}</h2>${can('admin')||can('edit')?`<button class="btn sm ghost" onclick="A.groupForm('${g.id}')">✎</button>`:''}</div>`;
+  if(!inGroup(g)) return h+`<div class="card"><div class="muted">${t('only_members')}</div></div>`;
+  h+=`<div class="card accent-${g.color||'blue'}"><div class="muted">${t('group_members')}</div>${g.memberIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')||'—'}</div>
+  <div class="card">${composeBox(g.id)}<div class="row wrap"><label class="btn ghost sm">📷 ${t('photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'newPostPhoto')"></label><button class="btn p right" onclick="A.addPost('${g.id}')">${t('post')}</button></div><div id="newPostPhoto"></div></div>`;
+  const posts=DB.posts.filter(p=>p.groupId===g.id).sort((a,b)=>b.createdAt-a.createdAt);
+  return h+(posts.length?posts.map(postCard).join(''):`<div class="empty">${t('none')}</div>`);
+}
+function viewAdminMsg(){
+  let h=`<h2>${can('admin')?t('admin_inbox'):t('msg_admin')}</h2>`;
+  if(!can('admin')) h+=`<div class="card accent-red"><div class="muted">${t('msg_admin_intro')}</div><textarea id="amText" placeholder="${t('write_msg')}"></textarea><button class="btn r block" onclick="A.sendAdminMsg()">✉️ ${t('send')}</button></div>`;
+  if(can('admin')){ const ms=[...DB.adminMsgs].sort((a,b)=>(a.read-b.read)||(b.at-a.at));
+    h+=ms.length?ms.map(m=>`<div class="card ${m.read?'':'accent-red'}" style="${m.read?'opacity:.6':''}"><b>${t('from')}: ${esc(m.fromName)}</b> <span class="muted">${ago(m.at)}</span><div style="white-space:pre-wrap;margin-top:4px">${esc(m.text)}</div>
+      <div class="row" style="margin-top:8px">${!m.read?`<button class="btn sm g" onclick="A.readAdminMsg('${m.id}')">✓ ${t('mark_read')}</button>`:''}<button class="btn sm ghost right" onclick="A.delAdminMsg('${m.id}')">🗑</button></div></div>`).join(''):`<div class="empty">${t('none')}</div>`; }
+  return h;
+}
+function viewHymns(){
+  const f=S.tab.hymn||'sunday'; const q=S.search.toLowerCase();
+  let list=DB.hymns.filter(x=>(x.title+' '+(x.tags||'')).toLowerCase().includes(q)); if(f==='sunday') list=list.filter(x=>DB.setlist.includes(x.id));
+  list.sort((a,b)=>a.title.localeCompare(b.title));
+  return `<div class="row"><h2 class="grow">${t('hymns')}</h2>${can('edit')?`<button class="btn sm p" onclick="A.hymnForm()">＋ ${t('add_hymn')}</button>`:''}</div>
+  <div class="tabs"><button class="${f==='sunday'?'on':''}" onclick="A.tab('hymn','sunday')">☀️ ${t('this_sunday')}</button><button class="${f==='all'?'on':''}" onclick="A.tab('hymn','all')">${t('all_songs')}</button></div>
+  <input type="search" placeholder="${t('search')}" value="${esc(S.search)}" oninput="S.search=this.value;render();document.querySelector('input[type=search]').focus()">
+  ${list.length?list.map(x=>`<div class="card hymn" onclick="A.hymnView('${x.id}')">${x.photo?`<img class="thumb" src="${x.photo}">`:`<div class="thumb">🎵</div>`}<div class="grow"><b>${esc(x.title)}</b><div class="muted">${x.key?t('key')+': '+esc(x.key):''} ${x.lyrics?'· 📝':''} ${DB.setlist.includes(x.id)?'· ☀️':''}</div></div><span>›</span></div>`).join(''):`<div class="empty">${t('none')}</div>`}`;
+}
+
+function viewBible(){
+  const ym=S.bibleMonth||todayYMD().slice(0,7); S.bibleMonth=ym; const [y,m]=ym.split('-').map(Number); const b=DB.bible[ym]||{book:'',theme:'',teacher:'',weeks:[]};
+  let h=`<div class="row" style="margin-bottom:8px"><button class="btn sm" onclick="A.bibleMove(-1)">‹</button><h2 class="grow" style="text-align:center;margin:0">${t('months')[m-1]} ${y}</h2><button class="btn sm" onclick="A.bibleMove(1)">›</button></div>
+  <div class="card accent-blue"><div class="muted">${t('month_theme')}</div><h2>${esc(b.book)||'—'}</h2><div>${esc(b.theme)}</div>${b.teacher?`<div class="muted">${t('teacher')}: ${esc(b.teacher)}</div>`:''}
+    ${can('edit')?`<button class="btn sm ghost" style="margin-top:8px" onclick="A.bibleForm()">✎ ${t('edit')}</button>`:''}</div>`;
+  const weeks=[...(b.weeks||[])].sort((a,c)=>a.date.localeCompare(c.date));
+  for(const w of weeks){ const i=b.weeks.indexOf(w); h+=`<div class="card"><div class="row"><div class="grow"><div class="muted">${t('week_of')} ${fmtDate(w.date)}</div><b>${esc(w.passage)}</b>${w.teacher?`<div class="muted">${esc(w.teacher)}</div>`:''}${w.notes?`<div>${esc(w.notes)}</div>`:''}</div>${can('edit')?`<button class="btn sm ghost" onclick="A.weekForm(${i})">✎</button>`:''}</div></div>`; }
+  if(can('edit')) h+=`<button class="btn block ghost" onclick="A.weekForm(-1)">＋ ${t('add_week')}</button>`;
+  h+=`<h3 style="margin-top:18px">${t('year_glance')}</h3><div class="grid2">${Array.from({length:12},(_,i)=>{const k=`${y}-${String(i+1).padStart(2,'0')}`;const bb=DB.bible[k];return `<div class="card ${k===ym?'accent-blue':''}" style="margin:0;padding:10px" onclick="S.bibleMonth='${k}';render()"><div class="muted">${t('months')[i]}</div><b>${esc(bb?.book||'—')}</b></div>`;}).join('')}</div>`;
+  return h;
+}
+
+function viewPrayer(){
+  let h=`<h2>${t('prayer')}</h2><div class="card accent-purple"><div class="muted">${t('prayer_intro')}</div><textarea id="prayText" placeholder="${t('write_prayer')}"></textarea>
+    <div class="row"><label class="chip"><input type="checkbox" id="prayAnon"> ${t('anonymous')}</label><button class="btn pu right" onclick="A.addPrayer()">🙏 ${t('send')}</button></div></div>`;
+  if(!can('prayer')) return h+`<div class="muted">${t('prayer_only_leads')}</div>`;
+  const ps=[...DB.prayers].sort((a,b)=>(a.answered-b.answered)||(b.createdAt-a.createdAt));
+  h+=ps.length?ps.map(p=>`<div class="card ${p.answered?'':'accent-purple'}" style="${p.answered?'opacity:.6':''}"><div class="row"><div class="grow"><b>${esc(p.name)}</b> <span class="muted">${ago(p.createdAt)}</span>${p.answered?` <span class="chip green">${t('answered')}</span>`:''}<div style="white-space:pre-wrap">${esc(p.text)}</div></div></div>
+    <div class="row" style="margin-top:8px">${!p.answered?`<button class="btn sm g" onclick="A.prayerAnswered('${p.id}')">✓ ${t('mark_answered')}</button>`:''}<button class="btn sm ghost right" onclick="A.delPrayer('${p.id}')">🗑</button></div></div>`).join(''):`<div class="empty">${t('none')}</div>`;
+  return h;
+}
+
+function viewMembers(){
+  const tab=S.tab.mem||'people'; const q=S.search.toLowerCase(); const ed=can('edit');
+  let h=`<h2>${t('members')} <span class="chip">${DB.members.length}</span></h2><div class="tabs"><button class="${tab==='people'?'on':''}" onclick="A.tab('mem','people')">👤 ${t('members')}</button><button class="${tab==='hh'?'on':''}" onclick="A.tab('mem','hh')">👨‍👩‍👧 ${t('households')}</button></div>`;
+  if(tab==='people'){
+    h+=`<div class="row wrap" style="margin-bottom:8px">${ed?`<button class="btn sm p" onclick="A.memberForm()">＋ ${t('add_member')}</button><button class="btn sm ghost" onclick="A.importForm()">📥 ${t('import')}</button>`:''}<button class="btn sm ghost" onclick="A.exportCSV()">📤 ${t('export')}</button></div>
+    <input type="search" placeholder="${t('search')}" value="${esc(S.search)}" oninput="S.search=this.value;render();document.querySelector('input[type=search]').focus()">`;
+    const ms=DB.members.filter(m=>(fullName(m)+' '+(m.ministry||'')).toLowerCase().includes(q)).sort((a,b)=>fullName(a).localeCompare(fullName(b)));
+    h+=`<div class="card list">${ms.map(m=>`<div class="item" ${ed?`onclick="A.memberForm('${m.id}')"`:''}><div class="avatar ${m.role==='pastor'?'gold':m.role==='member'?'blue':''}">${initials(m)}</div><div class="grow"><b>${esc(fullName(m))}</b><div class="muted">${L(CONFIG.roles[m.role]||{})}${m.ministry?' · '+esc(m.ministry):''}</div></div>${m.phone?`<a class="btn sm ghost" href="tel:${esc(m.phone)}" onclick="event.stopPropagation()">📞</a>`:''}</div>`).join('')||`<div class="empty">${t('none')}</div>`}</div>`;
+  } else {
+    h+=`${ed?`<button class="btn sm p" style="margin-bottom:8px" onclick="A.hhForm()">＋ ${t('new_household')}</button>`:''}`;
+    for(const hh of [...DB.households].sort((a,b)=>a.name.localeCompare(b.name))){ const kids=DB.children.filter(c=>c.householdId===hh.id);
+      h+=`<div class="card"><div class="row"><div class="grow"><b>${esc(hh.name)}</b><div class="muted">${t('parents')}: ${hh.parentIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')||'—'}</div></div>${ed?`<button class="btn sm ghost" onclick="A.hhForm('${hh.id}')">✎</button>`:''}</div>
+        <div class="list">${kids.map(c=>`<div class="item" ${ed?`onclick="A.childForm('${hh.id}','${c.id}')"`:''}><div class="avatar purple">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b> <span class="muted">${ageOf(c.birthdate)} ${t('age')} · ${L(CONFIG.ageGroups.find(g=>g.id===groupOf(c)))}</span>${c.allergies?`<div><span class="allergy">⚠ ${esc(c.allergies)}</span></div>`:''}</div></div>`).join('')}</div>
+        ${ed?`<button class="btn sm ghost" onclick="A.childForm('${hh.id}')">＋ ${t('add_child')}</button>`:''}</div>`; }
+  }
+  return h;
+}
+
+function viewSettings(){
+  if(ONLINE) return `<h2>${t('settings')}</h2>
+  <div class="card"><h3>${t('account')}</h3><div>${esc(fullName(me())||PROFILE.display_name||'')} <span class="muted">${esc(SESSION.user.email)}</span> · <span class="chip">${L(CONFIG.roles[PROFILE.role]||{})}</span></div>
+    <label class="f">${t('change_password')}</label><div class="row"><input type="password" id="np" autocomplete="new-password" style="margin:0"><button class="btn sm" onclick="A.changePw()">${t('save')}</button></div>
+    <button class="btn ghost block" style="margin-top:10px" onclick="A.logout()">${t('sign_out')}</button></div>
+  <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
+    <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
+  ${can('admin')?`<div class="card"><h3>${t('backup')}</h3><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button></div>`:''}
+  <div class="card muted">${t('version')} 0.3 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  return `<h2>${t('settings')}</h2>
+  <div class="card"><label class="f">${t('who_are_you')}</label><select onchange="S.userId=this.value;saveS();render()">${sel(DB.members.map(m=>({v:m.id,l:fullName(m)+' ('+L(CONFIG.roles[m.role]||{})+')'})),S.userId,'—')}</select>
+    <div class="hint">${S.lang==='es'?'Demostración: elige quién eres para probar los permisos. En la versión real cada persona entra con su propio enlace.':'Demo: pick who you are to test permissions. In the real version each person signs in with their own link.'}</div></div>
+  <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
+    <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
+  <div class="card"><h3>${t('backup')}</h3><div class="row wrap"><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button><label class="btn ghost">📂 ${t('restore_backup')}<input type="file" accept=".json" hidden onchange="A.restore(this)"></label></div></div>
+  <div class="card"><div class="row wrap"><button class="btn ghost" onclick="A.demo()">${t('load_demo')}</button><button class="btn r" onclick="A.wipe()">${t('wipe')}</button></div></div>
+  <div class="card muted">${t('version')} 0.3 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+}
+
+/* === ACTIONS (A.) ===  Everything a button calls. Keep each one small. */
+const A = {
+  go(v){ S.view=v; S.search=''; render(); },
+  tab(g,v){ S.tab[g]=v; render(); },
+  toggleLang(){ S.lang=S.lang==='es'?'en':'es'; saveS(); render(); },
+  toggleTheme(){ S.theme=S.theme==='dark'?'light':'dark'; saveS(); render(); },
+  modal(html){ document.getElementById('modal').innerHTML='<div class="bar"></div>'+html; document.getElementById('overlay').classList.add('show'); },
+  closeModal(){ document.getElementById('overlay').classList.remove('show'); },
+  // --- bulletin
+  pickPhoto(input,targetId){ const f=input.files[0]; if(!f) return; shrinkImage(f,url=>{ const el=document.getElementById(targetId); el.dataset.photo=url; el.innerHTML=`<img src="${url}" style="width:100%;border-radius:12px;margin-top:8px">`; }); },
+  addPost(groupId){ const u=me(); const text=document.getElementById('newPost').value.trim(); const text2=(document.getElementById('newPost2')?.value||'').trim(); const photo=document.getElementById('newPostPhoto')?.dataset.photo||null; if(!text&&!photo) return;
+    const isPastor=!groupId&&!!document.getElementById('asPastor')?.checked && can('pastorPost'); const pinned=!groupId&&!!document.getElementById('pinPost')?.checked && can('pastorPost');
+    DB.posts.unshift({id:uid(),authorId:u?u.id:null,authorName:u?fullName(u):'—',isPastor,pinned,text,text2:text2||null,lang:S.lang,groupId:groupId||null,photo,createdAt:Date.now(),reactions:{amen:[],heart:[]},comments:[]}); saveDB(); render(); toast(t('saved')); },
+  delPost(id){ if(!sure('del'))return; DB.posts=DB.posts.filter(p=>p.id!==id); saveDB(); render(); },
+  react(id,k){ const u=me(); if(!u)return; const p=DB.posts.find(x=>x.id===id); const arr=p.reactions[k]; const i=arr.indexOf(u.id); i>=0?arr.splice(i,1):arr.push(u.id); saveDB(); render(); },
+  comment(id){ const u=me(); const el=document.getElementById('c-'+id); const text=el.value.trim(); if(!text)return; DB.posts.find(x=>x.id===id).comments.push({name:u?fullName(u):'—',text,at:Date.now()}); saveDB(); render(); },
+  translate(id){ const p=DB.posts.find(x=>x.id===id); const tl=S.lang==='es'?'es':'en'; window.open(`https://translate.google.com/?sl=auto&tl=${tl}&text=${encodeURIComponent(p.text)}&op=translate`,'_blank'); },
+  viewPhoto(id){ const p=DB.posts.find(x=>x.id===id); A.modal(`<img src="${p.photo}" style="width:100%;border-radius:12px">`); },
+  confirmMe(d,tm){ const u=me(); if(!u)return; const a=att(d,tm); const i=a.confirmed.indexOf(u.id); i>=0?a.confirmed.splice(i,1):a.confirmed.push(u.id); saveDB(); render(); },
+  // --- calendar
+  calMove(n){ const [y,m]=S.calMonth.split('-').map(Number); const d=new Date(y,m-1+n,1); S.calMonth=toYMD(d).slice(0,7); render(); },
+  calPick(d){ S.calSel=d; render(); },
+  rsvp(id){ const u=me(); if(!u)return; const e=DB.events.find(x=>x.id===id); e.rsvp=e.rsvp||[]; const i=e.rsvp.indexOf(u.id); i>=0?e.rsvp.splice(i,1):e.rsvp.push(u.id); saveDB(); render(); },
+  ics(date,time,title,place){ const [h,m]=time.split(':'); const s=date.replace(/-/g,'')+'T'+h+m+'00'; const e2=date.replace(/-/g,'')+'T'+String(+h+2).padStart(2,'0')+m+'00';
+    download(title+'.ics',`BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//NuevoPacto//ES\nBEGIN:VEVENT\nUID:${uid()}@nuevopacto\nDTSTART:${s}\nDTEND:${e2}\nSUMMARY:${title}\nLOCATION:${place}\nEND:VEVENT\nEND:VCALENDAR`,'text/calendar'); },
+  eventForm(id){ const e=DB.events.find(x=>x.id===id)||{title:'',date:S.calSel,time:'19:00',place:'',details:'',ministry:'',color:'o'};
+    A.modal(`<h3>${id?t('edit'):t('add_event')}</h3><label class="f">${t('title')}</label><input type="text" id="e-title" value="${esc(e.title)}">
+    <div class="row"><div class="grow"><label class="f">${t('date')}</label><input type="date" id="e-date" value="${e.date}"></div><div class="grow"><label class="f">${t('time')}</label><input type="time" id="e-time" value="${e.time}"></div></div>
+    <label class="f">${t('place')}</label><input type="text" id="e-place" value="${esc(e.place)}"><label class="f">${t('ministry')}</label><input type="text" id="e-min" value="${esc(e.ministry)}" placeholder="${t('ministries_hint')}">
+    <label class="f">${t('details')}</label><textarea id="e-det">${esc(e.details)}</textarea>
+    <div class="row"><button class="btn p grow" onclick="A.saveEvent('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delEvent('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveEvent(id){ const g=i=>document.getElementById(i).value; const e=DB.events.find(x=>x.id===id)||{id:uid(),rsvp:[],color:'o'}; Object.assign(e,{title:g('e-title').trim(),date:g('e-date'),time:g('e-time'),place:g('e-place'),ministry:g('e-min'),details:g('e-det')});
+    if(!e.title)return; if(!id) DB.events.push(e); S.calSel=e.date; S.calMonth=e.date.slice(0,7); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delEvent(id){ if(!sure('del'))return; DB.events=DB.events.filter(x=>x.id!==id); saveDB(); A.closeModal(); render(); },
+  // --- attendance
+  attDate(v){ S.attDate=v; const ss=servicesOn(v); S.attTime=ss[0]?ss[0].time:null; render(); },
+  rerenderList(){ const el=document.getElementById('attList'); if(el) el.innerHTML=attList(); },
+  markPresent(id){ const a=att(S.attDate,S.attTime); const i=a.present.indexOf(id); i>=0?a.present.splice(i,1):a.present.push(id); saveDB(); A.rerenderList(); document.querySelector('.chip.green').textContent=`${t('present')}: ${a.present.length+a.visitors.length}`; },
+  visitorForm(){ A.modal(`<h3>${t('add_visitor')}</h3><label class="f">${t('name')}</label><input type="text" id="v-name"><label class="f">${t('phone')}</label><input type="tel" id="v-phone">
+    <div class="row"><button class="btn p grow" onclick="A.addVisitor()">${t('add')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  addVisitor(){ const n=document.getElementById('v-name').value.trim(); if(!n)return; att(S.attDate,S.attTime).visitors.push({name:n,phone:document.getElementById('v-phone').value.trim()}); saveDB(); A.closeModal(); render(); },
+  delVisitor(i){ att(S.attDate,S.attTime).visitors.splice(i,1); saveDB(); render(); },
+  shiftForm(id){ const s=DB.shifts.find(x=>x.id===id)||{date:(nextService()||{date:todayYMD()}).date,time:(nextService()||{time:'12:00'}).time,ministry:'',memberIds:[]};
+    A.modal(`<h3>${id?t('edit'):t('add_shift')}</h3><div class="row"><div class="grow"><label class="f">${t('date')}</label><input type="date" id="s-date" value="${s.date}"></div><div class="grow"><label class="f">${t('time')}</label><input type="time" id="s-time" value="${s.time}"></div></div>
+    <label class="f">${t('ministry')}</label><input type="text" id="s-min" list="grp-list" value="${esc(s.ministry)}" placeholder="${t('ministries_hint')}"><datalist id="grp-list">${DB.groups.map(g=>`<option value="${esc(g.name)}">`).join('')}</datalist><label class="f">${t('who_serves')}</label>
+    <div class="card list" style="max-height:40vh;overflow:auto">${[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>`<label class="item"><input type="checkbox" class="s-m" value="${m.id}" ${s.memberIds.includes(m.id)?'checked':''}> ${esc(fullName(m))} <span class="muted">${esc(m.ministry||'')}</span></label>`).join('')}</div>
+    <div class="row"><button class="btn p grow" onclick="A.saveShift('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delShift('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveShift(id){ const s=DB.shifts.find(x=>x.id===id)||{id:uid()}; Object.assign(s,{date:document.getElementById('s-date').value,time:document.getElementById('s-time').value,ministry:document.getElementById('s-min').value.trim(),memberIds:[...document.querySelectorAll('.s-m:checked')].map(c=>c.value)});
+    if(!id) DB.shifts.push(s); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delShift(id){ DB.shifts=DB.shifts.filter(x=>x.id!==id); saveDB(); A.closeModal(); render(); },
+  // --- kids
+  kidsDate(v){ const ss=servicesOn(v); S.kidsSvc={date:v,time:ss[0]?ss[0].time:'12:00'}; render(); },
+  kidIn(cid){ const c=DB.children.find(x=>x.id===cid); const hh=DB.households.find(x=>x.id===c.householdId); const parents=(hh?.parentIds||[]).map(id=>fullName(DB.members.find(m=>m.id===id))).filter(Boolean);
+    A.modal(`<h3>${t('checkin')}: ${esc(c.name)}</h3>${c.allergies?`<div class="allergy" style="margin-bottom:8px">⚠ ${t('allergies')}: ${esc(c.allergies)}</div>`:''}<label class="f">${t('dropped_by')}</label><select id="k-by">${sel(parents.map(p=>({v:p,l:p})),parents[0])}</select><div class="hint">${t('parents_only')}</div>
+    <div class="row"><button class="btn g grow" onclick="A.kidInSave('${cid}')">✓ ${t('checkin')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  kidInSave(cid){ const by=document.getElementById('k-by').value; if(!by)return; const key=attKey(S.kidsSvc.date,S.kidsSvc.time);
+    DB.kids.push({id:uid(),childId:cid,serviceKey:key,group:groupOf(DB.children.find(x=>x.id===cid)),checkInAt:Date.now(),droppedBy:by,checkedInBy:fullName(me()),checkOutAt:null,pickedUpBy:null,checkedOutBy:null}); saveDB(); A.closeModal(); render(); },
+  kidOut(cid){ const c=DB.children.find(x=>x.id===cid); const hh=DB.households.find(x=>x.id===c.householdId); const parents=(hh?.parentIds||[]).map(id=>fullName(DB.members.find(m=>m.id===id))).filter(Boolean); const allowed=[...parents,...(c.pickup||[])];
+    A.modal(`<h3>${t('checkout')}: ${esc(c.name)}</h3><label class="f">${t('picked_by')}</label><select id="k-by">${sel(allowed.map(p=>({v:p,l:p})),allowed[0])}</select><div class="hint">${t('only_parents')}</div>
+    <label class="chip" style="margin:6px 0 12px;display:inline-block"><input type="checkbox" id="k-id"> 🪪 ${t('id_checked')}</label>
+    <div class="row"><button class="btn r grow" onclick="A.kidOutSave('${cid}')">✓ ${t('checkout')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  kidOutSave(cid){ if(!document.getElementById('k-id').checked){ toast(t('needs_id')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time); const r=DB.kids.find(x=>x.childId===cid&&x.serviceKey===key&&!x.checkOutAt); if(!r)return;
+    Object.assign(r,{checkOutAt:Date.now(),pickedUpBy:document.getElementById('k-by').value,checkedOutBy:fullName(me())}); saveDB(); A.closeModal(); render(); },
+  // --- hymns
+  hymnForm(id){ const x=DB.hymns.find(h=>h.id===id)||{title:'',key:'',lyrics:'',tags:'',photo:null};
+    A.modal(`<h3>${id?t('edit'):t('add_hymn')}</h3><label class="f">${t('song_title')}</label><input type="text" id="h-title" value="${esc(x.title)}"><label class="f">${t('key')}</label><input type="text" id="h-key" value="${esc(x.key)}" style="width:120px">
+    <label class="btn ghost block">📷 ${t('upload_photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'h-photo')"></label><div id="h-photo" data-photo="${x.photo||''}">${x.photo?`<img src="${x.photo}" style="width:100%;border-radius:12px;margin-top:8px">`:''}</div>
+    <label class="f">${t('lyrics_chords')}</label><div class="hint">${t('chords_hint')}</div><textarea id="h-lyrics" style="min-height:140px;font-family:monospace">${esc(x.lyrics)}</textarea>
+    <label class="chip" style="display:inline-block;margin-bottom:12px"><input type="checkbox" id="h-sun" ${DB.setlist.includes(id)?'checked':''}> ☀️ ${t('in_setlist')}</label>
+    <div class="row"><button class="btn p grow" onclick="A.saveHymn('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delHymn('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveHymn(id){ const x=DB.hymns.find(h=>h.id===id)||{id:uid(),createdAt:Date.now()}; Object.assign(x,{title:document.getElementById('h-title').value.trim(),key:document.getElementById('h-key').value.trim(),lyrics:document.getElementById('h-lyrics').value,photo:document.getElementById('h-photo').dataset.photo||null});
+    if(!x.title)return; if(!id) DB.hymns.push(x); const sun=document.getElementById('h-sun').checked; DB.setlist=DB.setlist.filter(i=>i!==x.id); if(sun) DB.setlist.push(x.id); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delHymn(id){ if(!sure('del'))return; DB.hymns=DB.hymns.filter(h=>h.id!==id); DB.setlist=DB.setlist.filter(i=>i!==id); saveDB(); A.closeModal(); render(); },
+  hymnView(id){ const x=DB.hymns.find(h=>h.id===id); A.modal(`<div class="row"><h3 class="grow">${esc(x.title)} ${x.key?`<span class="chip">${esc(x.key)}</span>`:''}</h3>${can('edit')?`<button class="btn sm ghost" onclick="A.hymnForm('${id}')">✎</button>`:''}</div>
+    ${x.photo?`<img src="${x.photo}" style="width:100%;border-radius:12px">`:''}${x.lyrics?`<pre class="lyrics">${chordSheet(x.lyrics)}</pre>`:''}${!x.photo&&!x.lyrics?`<div class="empty">${t('none')}</div>`:''}
+    <button class="btn block" style="margin-top:10px" onclick="A.closeModal()">${t('close')}</button>`); },
+  // --- bible
+  bibleMove(n){ const [y,m]=S.bibleMonth.split('-').map(Number); S.bibleMonth=toYMD(new Date(y,m-1+n,1)).slice(0,7); render(); },
+  bibleForm(){ const b=DB.bible[S.bibleMonth]||{book:'',theme:'',teacher:'',weeks:[]};
+    A.modal(`<h3>${t('month_theme')}</h3><label class="f">${t('book')}</label><input type="text" id="b-book" value="${esc(b.book)}" placeholder="1 Corintios"><label class="f">${t('month_theme')}</label><input type="text" id="b-theme" value="${esc(b.theme)}"><label class="f">${t('teacher')}</label><input type="text" id="b-teacher" value="${esc(b.teacher)}">
+    <div class="row"><button class="btn p grow" onclick="A.saveBible()">${t('save')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveBible(){ const b=DB.bible[S.bibleMonth]||(DB.bible[S.bibleMonth]={weeks:[]}); b.book=document.getElementById('b-book').value.trim(); b.theme=document.getElementById('b-theme').value.trim(); b.teacher=document.getElementById('b-teacher').value.trim(); saveDB(); A.closeModal(); render(); },
+  weekForm(i){ const b=DB.bible[S.bibleMonth]||(DB.bible[S.bibleMonth]={book:'',theme:'',teacher:'',weeks:[]}); const w=b.weeks[i]||{date:S.bibleMonth+'-01',passage:'',teacher:b.teacher||'',notes:''};
+    A.modal(`<h3>${t('week_of')}</h3><label class="f">${t('date')}</label><input type="date" id="w-date" value="${w.date}"><label class="f">${t('passage')}</label><input type="text" id="w-pass" value="${esc(w.passage)}"><label class="f">${t('teacher')}</label><input type="text" id="w-teacher" value="${esc(w.teacher)}"><label class="f">${t('notes')}</label><textarea id="w-notes">${esc(w.notes)}</textarea>
+    <div class="row"><button class="btn p grow" onclick="A.saveWeek(${i})">${t('save')}</button>${i>=0?`<button class="btn r" onclick="A.delWeek(${i})">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveWeek(i){ const b=DB.bible[S.bibleMonth]; const w=b.weeks[i]||{}; Object.assign(w,{date:document.getElementById('w-date').value,passage:document.getElementById('w-pass').value.trim(),teacher:document.getElementById('w-teacher').value.trim(),notes:document.getElementById('w-notes').value.trim()}); if(i<0) b.weeks.push(w); saveDB(); A.closeModal(); render(); },
+  delWeek(i){ DB.bible[S.bibleMonth].weeks.splice(i,1); saveDB(); A.closeModal(); render(); },
+  // --- prayer
+  addPrayer(){ const text=document.getElementById('prayText').value.trim(); if(!text)return; const anon=document.getElementById('prayAnon').checked; const u=me();
+    DB.prayers.unshift({id:uid(),name:anon||!u?(S.lang==='es'?'Anónimo':'Anonymous'):fullName(u),text,createdAt:Date.now(),answered:false,authorMemberId:u?u.id:null}); saveDB(); render(); toast(t('prayer_sent')); },
+  prayerAnswered(id){ DB.prayers.find(p=>p.id===id).answered=true; saveDB(); render(); },
+  delPrayer(id){ if(!sure('del'))return; DB.prayers=DB.prayers.filter(p=>p.id!==id); saveDB(); render(); },
+  // --- members & households
+  memberForm(id){ const m=DB.members.find(x=>x.id===id)||{first:'',last:'',phone:'',email:'',birthdate:'',ministry:'',role:'member',householdId:'',notes:''};
+    A.modal(`<h3>${id?t('edit'):t('add_member')}</h3><div class="row"><div class="grow"><label class="f">${t('first')}</label><input type="text" id="m-first" value="${esc(m.first)}"></div><div class="grow"><label class="f">${t('last')}</label><input type="text" id="m-last" value="${esc(m.last)}"></div></div>
+    <label class="f">${t('phone')}</label><input type="tel" id="m-phone" value="${esc(m.phone)}"><label class="f">${t('email')}</label><input type="email" id="m-email" value="${esc(m.email)}"><label class="f">${t('birthdate')}</label><input type="date" id="m-birth" value="${m.birthdate||''}">
+    <label class="f">${t('ministry')}</label><input type="text" id="m-min" value="${esc(m.ministry)}" placeholder="${t('ministries_hint')}">${(!ONLINE||can('admin'))?`<label class="f">${t('role')}</label><select id="m-role">${sel(Object.keys(CONFIG.roles).map(r=>({v:r,l:L(CONFIG.roles[r])})),m.role)}</select>`:`<input type="hidden" id="m-role" value="${esc(m.role)}">`}
+    <label class="f">${t('household')}</label><select id="m-hh">${sel(DB.households.map(h=>({v:h.id,l:h.name})),m.householdId||'','—')}</select>
+    <div class="row"><button class="btn p grow" onclick="A.saveMember('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delMember('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveMember(id){ const g=i=>document.getElementById(i).value; const m=DB.members.find(x=>x.id===id)||{id:uid(),notes:''}; const oldHH=m.householdId;
+    Object.assign(m,{first:g('m-first').trim(),last:g('m-last').trim(),phone:g('m-phone').trim(),email:g('m-email').trim(),birthdate:g('m-birth'),ministry:g('m-min').trim(),role:g('m-role'),householdId:g('m-hh')||null});
+    if(!m.first)return; if(!id) DB.members.push(m);
+    DB.households.forEach(h=>{ h.parentIds=h.parentIds.filter(p=>p!==m.id); if(h.id===m.householdId) h.parentIds.push(m.id); });
+    if(ONLINE&&can('admin')){ const pr=PROFILES.find(p=>p.member_id===m.id); if(pr&&pr.role!==m.role){ pr.role=m.role; sb.from('profiles').update({role:m.role}).eq('user_id',pr.user_id).then(()=>{}); } }
+    saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delMember(id){ if(!sure('del'))return; DB.members=DB.members.filter(x=>x.id!==id); DB.households.forEach(h=>h.parentIds=h.parentIds.filter(p=>p!==id)); saveDB(); A.closeModal(); render(); },
+  hhForm(id){ const h=DB.households.find(x=>x.id===id)||{name:'',parentIds:[]};
+    A.modal(`<h3>${id?t('edit'):t('new_household')}</h3><label class="f">${t('family_name')}</label><input type="text" id="hh-name" value="${esc(h.name)}"><label class="f">${t('parents')}</label>
+    <div class="card list" style="max-height:40vh;overflow:auto">${[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>`<label class="item"><input type="checkbox" class="hh-p" value="${m.id}" ${h.parentIds.includes(m.id)?'checked':''}> ${esc(fullName(m))}</label>`).join('')}</div>
+    <div class="row"><button class="btn p grow" onclick="A.saveHH('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delHH('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveHH(id){ const h=DB.households.find(x=>x.id===id)||{id:uid()}; h.name=document.getElementById('hh-name').value.trim(); h.parentIds=[...document.querySelectorAll('.hh-p:checked')].map(c=>c.value); if(!h.name)return; if(!id) DB.households.push(h);
+    DB.members.forEach(m=>{ if(h.parentIds.includes(m.id)) m.householdId=h.id; else if(m.householdId===h.id) m.householdId=null; }); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delHH(id){ if(!sure('del'))return; DB.households=DB.households.filter(x=>x.id!==id); DB.children=DB.children.filter(c=>c.householdId!==id); DB.members.forEach(m=>{if(m.householdId===id)m.householdId=null;}); saveDB(); A.closeModal(); render(); },
+  childForm(hhId,id){ const c=DB.children.find(x=>x.id===id)||{name:'',birthdate:'',allergies:'',pickup:[],classId:''}; hhId=hhId||c.householdId||'';
+    A.modal(`<h3>${id?t('edit'):t('add_child')}</h3><label class="f">${t('household')}</label><select id="c-hh">${sel([...DB.households].sort((a,b)=>a.name.localeCompare(b.name)).map(h=>({v:h.id,l:h.name})),hhId,t('pick_household'))}</select>
+    <label class="f">${t('child_name')}</label><input type="text" id="c-name" value="${esc(c.name)}"><label class="f">${t('birthdate')}</label><input type="date" id="c-birth" value="${c.birthdate}">
+    <label class="f">${t('class_override')}</label><select id="c-class">${sel(CONFIG.ageGroups.map(g=>({v:g.id,l:L(g)})),c.classId||'',t('auto_by_age'))}</select>
+    <label class="f">${t('allergies')}</label><input type="text" id="c-all" value="${esc(c.allergies)}"><label class="f">${t('pickup_list')}</label><textarea id="c-pick">${esc((c.pickup||[]).join('\n'))}</textarea>
+    <div class="row"><button class="btn p grow" onclick="A.saveChild('${hhId}','${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delChild('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveChild(hhId,id){ hhId=document.getElementById('c-hh').value; if(!hhId){ toast(t('pick_household')); return; } const c=DB.children.find(x=>x.id===id)||{id:uid()}; c.householdId=hhId; c.classId=document.getElementById('c-class').value||null; Object.assign(c,{name:document.getElementById('c-name').value.trim(),birthdate:document.getElementById('c-birth').value,allergies:document.getElementById('c-all').value.trim(),pickup:document.getElementById('c-pick').value.split('\n').map(s=>s.trim()).filter(Boolean)});
+    if(!c.name||!c.birthdate)return; if(!id) DB.children.push(c); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delChild(id){ if(!sure('del'))return; DB.children=DB.children.filter(x=>x.id!==id); saveDB(); A.closeModal(); render(); },
+  importForm(){ A.modal(`<h3>${t('import')}</h3><div class="hint">${t('import_hint')}</div><textarea id="imp" style="min-height:160px;font-family:monospace" placeholder="Nombre\tApellido\tTeléfono\tCorreo\tFecha de nacimiento\tMinisterio"></textarea>
+    <label class="btn ghost block">📂 CSV<input type="file" accept=".csv,.txt" hidden onchange="const r=new FileReader();r.onload=e=>document.getElementById('imp').value=e.target.result;r.readAsText(this.files[0])"></label>
+    <div class="row" style="margin-top:10px"><button class="btn p grow" onclick="A.doImport()">${t('import')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  doImport(){ const raw=document.getElementById('imp').value.trim(); if(!raw)return; const sep=raw.includes('\t')?'\t':','; const rows=raw.split(/\r?\n/).map(r=>r.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+    const head=rows[0].map(h=>h.toLowerCase()); const find=(...names)=>head.findIndex(h=>names.some(n=>h.includes(n)));
+    const iF=find('nombre','first','name'), iL=find('apellido','last'), iP=find('tel','phone','cel'), iE=find('correo','email','mail'), iB=find('nacim','birth','fecha'), iM=find('minist');
+    const hasHeader=iF>=0; let n=0;
+    for(const r of rows.slice(hasHeader?1:0)){ if(!r[0])continue; let first,last; if(hasHeader){ first=r[iF]||''; last=iL>=0?r[iL]||'':''; if(!last&&first.includes(' ')){ [first,...last]=first.split(' '); last=last.join(' '); } } else { [first,...last]=r[0].split(' '); last=last.join(' '); }
+      if(DB.members.some(m=>m.first.toLowerCase()===first.toLowerCase()&&m.last.toLowerCase()===last.toLowerCase()))continue;
+      DB.members.push({id:uid(),first,last,phone:iP>=0?r[iP]||'':'',email:iE>=0?r[iE]||'':'',birthdate:iB>=0?normDate(r[iB]):'',ministry:iM>=0?r[iM]||'':'',role:'member',householdId:null,notes:''}); n++; }
+    saveDB(); A.closeModal(); render(); toast(`${n} ${t('imported')}`); },
+  exportCSV(){ const rows=[['Nombre','Apellido','Teléfono','Correo','Fecha de nacimiento','Ministerio','Rol','Familia'],...DB.members.map(m=>[m.first,m.last,m.phone,m.email,m.birthdate,m.ministry,m.role,DB.households.find(h=>h.id===m.householdId)?.name||''])];
+    download('miembros.csv','﻿'+rows.map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv'); },
+  // --- groups
+  groupForm(id){ const g=DB.groups.find(x=>x.id===id)||{name:'',color:'blue',memberIds:[]};
+    A.modal(`<h3>${id?t('edit'):t('new_group')}</h3><label class="f">${t('group_name')}</label><input type="text" id="g-name" value="${esc(g.name)}"><label class="f">${t('color')}</label><select id="g-color">${sel(['red','gold','blue','purple'].map(c=>({v:c,l:c})),g.color)}</select>
+    <label class="f">${t('group_members')}</label><div class="card list" style="max-height:40vh;overflow:auto">${[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>`<label class="item"><input type="checkbox" class="g-m" value="${m.id}" ${g.memberIds.includes(m.id)?'checked':''}> ${esc(fullName(m))}</label>`).join('')}</div>
+    <div class="row"><button class="btn p grow" onclick="A.saveGroup('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delGroup('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  saveGroup(id){ const g=DB.groups.find(x=>x.id===id)||{id:uid()}; g.name=document.getElementById('g-name').value.trim(); g.color=document.getElementById('g-color').value; g.memberIds=[...document.querySelectorAll('.g-m:checked')].map(c=>c.value); if(!g.name)return; if(!id) DB.groups.push(g); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  delGroup(id){ if(!sure('del'))return; DB.groups=DB.groups.filter(x=>x.id!==id); DB.posts=DB.posts.filter(p=>p.groupId!==id); saveDB(); A.closeModal(); A.go('groups'); },
+  // --- administrator messages
+  sendAdminMsg(){ const text=document.getElementById('amText').value.trim(); if(!text)return; const u=me(); DB.adminMsgs.unshift({id:uid(),fromId:u?u.id:null,fromName:u?fullName(u):'—',text,at:Date.now(),read:false}); saveDB(); render(); toast(t('sent')); },
+  readAdminMsg(id){ DB.adminMsgs.find(m=>m.id===id).read=true; saveDB(); render(); },
+  delAdminMsg(id){ if(!sure('del'))return; DB.adminMsgs=DB.adminMsgs.filter(m=>m.id!==id); saveDB(); render(); },
+  // --- auth (online only)
+  async login(){ const email=document.getElementById('au-email').value.trim(), pw=document.getElementById('au-pw').value; if(!email||!pw) return; const {error}=await sb.auth.signInWithPassword({email,password:pw}); if(error) toast(t('login_failed')); },
+  async signup(){ const name=document.getElementById('au-name').value.trim(), email=document.getElementById('au-email').value.trim(), pw=document.getElementById('au-pw').value; if(!name||!email) return; if(pw.length<8){ toast(t('pw_short')); return; }
+    const {error}=await sb.auth.signUp({email,password:pw,options:{data:{name}}}); if(error){ toast(error.message); return; } S.authMode='created'; render(); },
+  async forgot(){ const email=document.getElementById('au-email').value.trim(); if(!email) return; const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}); if(error){ toast(error.message); return; } toast(t('reset_sent')); S.authMode='login'; render(); },
+  async resetPw(){ const pw=document.getElementById('au-pw').value; if(pw.length<8){ toast(t('pw_short')); return; } const {error}=await sb.auth.updateUser({password:pw}); if(error){ toast(error.message); return; } S.authMode='login'; toast(t('pw_changed')); await afterLogin(); },
+  async changePw(){ const pw=document.getElementById('np').value; if(pw.length<8){ toast(t('pw_short')); return; } const {error}=await sb.auth.updateUser({password:pw}); toast(error?error.message:t('pw_changed')); },
+  async logout(){ await sb.auth.signOut(); S.authMode='login'; },
+  // --- users & access (administrator)
+  async approve(uidv){ const p=PROFILES.find(x=>x.user_id===uidv); const role=document.getElementById('ur-'+uidv).value; let mid=document.getElementById('um-'+uidv).value;
+    if(!mid){ const [first,...rest]=(p.display_name||p.email).split(' '); const m={id:uid(),first,last:rest.join(' '),phone:'',email:p.email||'',birthdate:'',ministry:'',role,householdId:null,notes:''}; DB.members.push(m); mid=m.id; }
+    else { const m=DB.members.find(x=>x.id===mid); if(m){ m.role=role; if(!m.email) m.email=p.email||''; } }
+    saveDB(); const {error}=await sb.from('profiles').update({approved:true,role,member_id:mid}).eq('user_id',uidv); if(error){ toast(t('sync_error')); return; } await loadProfiles(); render(); toast(t('saved')); },
+  async relink(uidv){ const role=document.getElementById('ur-'+uidv).value, mid=document.getElementById('um-'+uidv).value||null; const m=DB.members.find(x=>x.id===mid); if(m){ m.role=role; saveDB(); }
+    const {error}=await sb.from('profiles').update({role,member_id:mid}).eq('user_id',uidv); if(error){ toast(t('sync_error')); return; } await loadProfiles(); render(); toast(t('saved')); },
+  async setUserRole(uidv,role){ const p=PROFILES.find(x=>x.user_id===uidv); const m=DB.members.find(x=>x.id===p.member_id); if(m){ m.role=role; saveDB(); } await sb.from('profiles').update({role}).eq('user_id',uidv); await loadProfiles(); render(); },
+  async revoke(uidv){ if(!sure('revoke')) return; await sb.from('profiles').update({approved:false}).eq('user_id',uidv); await loadProfiles(); render(); },
+  // --- settings / backup
+  backup(){ download(`nuevopacto-respaldo-${todayYMD()}.json`, JSON.stringify({version:1,exportedAt:new Date().toISOString(),db:DB},null,1)); toast(t('saved')); },
+  restore(input){ const f=input.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{ try{ const j=JSON.parse(e.target.result); DB=Object.assign(emptyDB(), j.db||j); saveDB(); render(); toast(t('saved')); }catch(err){ toast('Error'); } }; r.readAsText(f); },
+  demo(){ loadDemo(); render(); toast(t('saved')); },
+  wipe(){ if(!sure('wipe'))return; DB=emptyDB(); S.userId=null; saveDB(); saveS(); render(); },
+};
+function normDate(s){ if(!s)return ''; if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s; const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/); if(m){ let y=m[3]; if(y.length===2) y=(+y>30?'19':'20')+y; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; } return ''; }
+
+/* === INIT === */
+document.getElementById('logo').src = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCAHgAd4DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5UooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKK63wd8MPEPjrRtc1bR4YXt9Eh8643uQzDBOEGOTgE9ulcqkTyOqIpZmIAAHJNADKK6jx/4B1L4d6hY6dq7Ri8urKO8eJP+WO8nCE9yMc1y9ABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABXufwN+EGlfE34ceM5XhD65bMi2EmT+7YIWxj/aPFeG44r6E/Y78USaZ4n1zRFcbr6y+0Qof4pIjnA+qsaAOo/Y0uLZNP8Y6Ler5cpkhMiMOQpDIQfoTj8a8s8AeAUi/aATw5foPs2lahNNMCPvRQ5cfmAv517C2jjwF+0O02nYTSfG+nyvblfuifbvwP+BqD/wADq7qFjozfHDUNaMQgur7wr/aFq0Zx5koBWXI7/L/KgDyb9r+TzPi4CBgf2Zb4H/fRrxCva/2s7ue/+KAuGgKWosoobeTH+tC53Ef8CJH4V4pQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRSjrQB6R8C7Lwtr3iqTwx4stYmtdahNrb3ZOJLSfqjIexJ4981Y8U+D/FP7OnxC06+3LJ5Ev2ixvEH7u5jBwVI7HHBX3rmtK8AeIdT8Nt4p0OP7db2cuLlbRiZ7NhyrMo5weoYZ6V9KeC/GOg/GbwhDbeJB/a93aW3k6rp8y/v4yAV+123ckD7wHpnGeoB10fkeOvCFtcWlvJBfWYj8RaFvUbwoO4wg9wG3IcdmU1zIn0jVfiT4OvmjWS11C3vLG1lOQYvPj82L8QTLHg+hqp4QbXfhdqNr4VvpDfaXDMLjwxrY5hmWTObSRh03jIHowHtVvxLYJps9tqOk2xmTT7tNc0+IryYjJmSLHZkkMi47eYKAOC/auga60jwJq7YEhsprObjnfGVBB/HdXzpX2b8cvCzeNfhxqf8AZJSRLRx4ishsy01vIpMir6YYsT+FfGZGKAEooooAKKKKACiiigAooooAKKKKACiiigAooooAKK7r4Q/C66+KniSXS4rr7FbW1u9zc3JTeI1HQY9ST/OuJuYhBcSxBgwRyu4dDg9aAI6KKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKUdaSigD0X4SeJfGPw61EeMNF0q/vNIVvIvgsTNBMnBKMwGAR1B7V9Sab4f8MeNrCD4nfDKysINeX940Ese2Odh96GQD7j+jr7dRXzf8D/AI833wmkn0+4sxqWiXkgea23YaNsYLIenTqD1xX1HaeGvBepbPG3hEXtil9FmS90GchUc87pIBlWI6H5T3yO9AGVoPizQvG+h6hFFbXVlYiX/iZ6ZIhE+iXQbPnx8YKBuTjp1wORWlZQT300kF6sf9pWkvmTiP7krOuBNH/0znUc+kgFZWuap4l8GyyeMNOtrfW7aTAv5dMXMGpRjjdLEMmKdR/GMqejY4ra8LavoOuwab4h8P3Bn0SRzFGyrmTTXY/Nbyp18onoP4WwRxQB1Hh3Slh8m2aLdbRRtJbSgZQxSffhb05wQPTHpXx1+0N8FLv4beIpdT063eTw5fSF4JVGRbuTkxN6ex7ivulols7WY20QLAO6pngsef1NefeANC1zxf4T+2+ONX/taHWYmeXSZLWIQQKScICF3ZA7k9aAPz3IxSV7/wDtCfs6Wfw209vFGhX+dJknWJrKc5khZs42t/EvHfke9eAUAFFFFABRRRQAUUUUAFFFFABRRRQAUoGaSvQPg54BXxn4kFzqEb/2Jpm24vWUcyc/JCvqzthQPc0Ae1fDmyi+Dn7P2v8AiK8TytZ1m081AwwUWTMcC/U5Z/pXysepz1r6T/aSm1zUPD5ggiRdL0q7jOqSocIb2RcJbp6rFGAp9CfWvmw9aAEooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAo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";
+loadS();
+if(ONLINE){ render(); initOnline().catch(e=>{ console.error(e); document.getElementById('main').innerHTML=`<div class="empty">${t('sync_error')}</div>`; }); }
+else { loadDB(); if(!DB.members.length && !localStorage.getItem(DB_KEY)) loadDemo(); if(!S.userId && DB.members[0]) S.userId=DB.members[0].id; render(); }
+</script>
+</body>
+</html>
