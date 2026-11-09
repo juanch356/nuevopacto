@@ -11,7 +11,7 @@
 =====================================================================
  NUEVO PACTO - Iglesia Evangelica Pentecostes (SCV)
  Single-file church planning app. Mobile first. Spanish default.
- Version 0.3  Built by Todd Marshall with Claude.
+ Version 0.3.1  Built by Todd Marshall with Claude.
 
  FILE MAP (search for the === banners):
    === CSS ===              theme variables (light/dark), layout
@@ -165,11 +165,11 @@ const CONFIG = {
   ],
   // Roles and what each can do. Add a role here and it appears in the member editor.
   roles: {
-    pastor:  {es:'Pastor',             en:'Pastor',         can:['pastorPost','edit','kids','prayer','attendance']},
-    admin:   {es:'Administrador',      en:'Admin',          can:['edit','kids','prayer','attendance','admin']},
-    lead:    {es:'Líder de ministerio',en:'Ministry lead',  can:['edit','attendance']},
+    pastor:  {es:'Pastor',             en:'Pastor',         can:['post','pastorPost','edit','kids','prayer','attendance']},
+    admin:   {es:'Administrador',      en:'Admin',          can:['post','edit','kids','prayer','attendance','admin']},
+    lead:    {es:'Líder de ministerio',en:'Ministry lead',  can:['post','edit','attendance']},
     teacher: {es:'Maestro/a de niños', en:'Kids teacher',   can:['kids']},
-    prayer:  {es:'Líder de oración',   en:'Prayer lead',    can:['prayer']},
+    prayer:  {es:'Líder de oración',   en:'Prayer lead',    can:['post','prayer']},
     member:  {es:'Miembro',            en:'Member',         can:[]},
   },
   // Shared backend. Leave both empty for a local-only demo (data stays on each phone).
@@ -197,7 +197,7 @@ es:{
   add_shift:'Nuevo turno', who_serves:'¿Quiénes sirven?', kids_checkin:'Entrada y salida de niños',
   checkin:'Entrada', checkout:'Salida', dropped_by:'Entregado por', picked_by:'Recogido por', id_checked:'Identificación verificada',
   approved_pickup:'Personas autorizadas para recoger', allergies:'Alergias', in_class:'en clase', no_kids:'No hay niños en este grupo.',
-  only_parents:'Solo los padres y las personas autorizadas pueden recoger.', needs_id:'Marca que verificaste la identificación.',
+  only_parents:'Solo los padres y las personas autorizadas pueden recoger.', not_listed:'Esta persona NO está en la lista de autorizados. Verifica con los padres antes de entregar.', type_name:'Escribe el nombre...', needs_id:'Marca que verificaste la identificación.',
   hymns:'Himnos y cantos', this_sunday:'Este domingo', all_songs:'Todos', add_hymn:'Nuevo canto', song_title:'Título del canto',
   key:'Tono', lyrics_chords:'Letra y acordes (opcional)', upload_photo:'Subir foto de la hoja', in_setlist:'En la lista de este domingo',
   bible:'Estudio Bíblico', month_theme:'Tema del mes', book:'Libro', teacher:'Maestro', passage:'Pasaje', week_of:'Semana del',
@@ -253,7 +253,7 @@ en:{
   add_shift:'New shift', who_serves:'Who is serving?', kids_checkin:'Kids check-in / check-out',
   checkin:'Check in', checkout:'Check out', dropped_by:'Dropped off by', picked_by:'Picked up by', id_checked:'ID verified',
   approved_pickup:'Approved pickup people', allergies:'Allergies', in_class:'in class', no_kids:'No children in this group.',
-  only_parents:'Only parents and approved people can pick up.', needs_id:'Please confirm you checked the ID.',
+  only_parents:'Only parents and approved people can pick up.', not_listed:'This person is NOT on the approved list. Check with the parents before releasing.', type_name:'Type the name...', needs_id:'Please confirm you checked the ID.',
   hymns:'Hymns & songs', this_sunday:'This Sunday', all_songs:'All', add_hymn:'New song', song_title:'Song title',
   key:'Key', lyrics_chords:'Lyrics & chords (optional)', upload_photo:'Upload photo of the sheet', in_setlist:"On this Sunday's list",
   bible:'Bible Study', month_theme:'Theme of the month', book:'Book', teacher:'Teacher', passage:'Passage', week_of:'Week of',
@@ -361,7 +361,7 @@ async function initOnline(){
 async function afterLogin(){ const {data}=await sb.from('profiles').select('*').eq('user_id',SESSION.user.id).maybeSingle(); PROFILE=data||null;
   if(PROFILE&&PROFILE.approved){ try{ await loadAll(); if(can('admin')) await loadProfiles(); }catch(e){ console.error(e); toast(t('sync_error')); } if(!S.rt){ subscribeRealtime(); S.rt=true; } }
   render(); }
-function renderSoft(){ const a=document.activeElement; if(a&&(a.tagName==='TEXTAREA'||a.tagName==='INPUT')&&a.value){ S.pendingRender=true; return; } if(document.getElementById('overlay').classList.contains('show')){ S.pendingRender=true; return; } render(); }
+function renderSoft(){ if(document.getElementById('overlay').classList.contains('show')){ S.pendingRender=true; return; } render(); }
 document.addEventListener('focusout',()=>{ if(S.pendingRender){ S.pendingRender=false; setTimeout(()=>{ if(!document.getElementById('overlay').classList.contains('show')) render(); },150); } });
 const S = { lang:'es', theme:'light', view:'home', userId:null, tab:{}, calMonth:null, calSel:null, attDate:null, attTime:null, kidsGroup:'g1', search:'' };
 const S_KEY = 'nuevopacto.settings.v1';
@@ -481,7 +481,18 @@ function download(name,text,type='application/json'){ const a=document.createEle
 const sel=(opts,val,empty)=>(empty?`<option value="">${esc(empty)}</option>`:'')+opts.map(o=>`<option value="${esc(o.v)}" ${o.v===val?'selected':''}>${esc(o.l)}</option>`).join('');
 
 /* === VIEWS === */
+function snapshotDrafts(){ const main=document.getElementById('main'); const d={vals:{},photo:null,open2:false,focus:null};
+  main.querySelectorAll('textarea[id],input[id]').forEach(el=>{ if(el.type==='checkbox') d.vals[el.id]={checked:el.checked}; else if(el.value) d.vals[el.id]={value:el.value}; });
+  const ph=document.getElementById('newPostPhoto'); if(ph&&ph.dataset.photo){ d.photo=ph.dataset.photo; }
+  const w=document.getElementById('post2wrap'); if(w&&w.style.display==='block') d.open2=true;
+  const a=document.activeElement; if(a&&a.id&&main.contains(a)) d.focus={id:a.id,s:a.selectionStart,e:a.selectionEnd};
+  return d; }
+function restoreDrafts(d){ for(const id in d.vals){ const el=document.getElementById(id); if(!el) continue; if('checked' in d.vals[id]) el.checked=d.vals[id].checked; else el.value=d.vals[id].value; }
+  if(d.photo){ const ph=document.getElementById('newPostPhoto'); if(ph){ ph.dataset.photo=d.photo; ph.innerHTML=`<img src="${d.photo}" style="width:100%;border-radius:12px;margin-top:8px">`; } }
+  if(d.open2){ const w=document.getElementById('post2wrap'); if(w) w.style.display='block'; }
+  if(d.focus){ const el=document.getElementById(d.focus.id); if(el){ try{ el.focus({preventScroll:true}); if(d.focus.s!=null&&el.setSelectionRange) el.setSelectionRange(d.focus.s,d.focus.e); }catch(e){} } } }
 function render(){
+  const drafts=snapshotDrafts(); S._drafts=drafts;
   document.documentElement.setAttribute('data-theme',S.theme); document.documentElement.lang=S.lang;
   document.getElementById('themeBtn').textContent=S.theme==='dark'?'☀️':'🌙';
   document.getElementById('l-es').className=S.lang==='es'?'on':''; document.getElementById('l-en').className=S.lang==='en'?'on':'';
@@ -489,6 +500,7 @@ function render(){
     if(gate){ document.getElementById('main').innerHTML=gate; document.getElementById('nav').innerHTML=''; document.getElementById('nav').style.display='none'; return; } document.getElementById('nav').style.display='flex'; }
   const views={home:viewHome,cal:viewCal,att:viewAtt,kids:viewKids,more:viewMore,hymns:viewHymns,bible:viewBible,prayer:viewPrayer,members:viewMembers,settings:viewSettings,groups:viewGroups,group:viewGroup,adminmsg:viewAdminMsg,users:viewUsers};
   document.getElementById('main').innerHTML=(views[S.view]||viewHome)();
+  if(S._keepDrafts!==false) restoreDrafts(drafts);
   const navItems=[['home','🏠',t('nav_home')],['cal','📅',t('nav_cal')],['att','✅',t('nav_att')],['kids','🧒',t('nav_kids')],['more','☰',t('nav_more')]];
   const moreViews=['more','hymns','bible','prayer','members','settings','groups','group','adminmsg','users'];
   document.getElementById('nav').innerHTML=navItems.map(([v,ic,l])=>`<button class="${(S.view===v||(v==='more'&&moreViews.includes(S.view)))?'on':''}" onclick="A.go('${v}')"><span class="ic">${ic}</span>${l}</button>`).join('');
@@ -525,8 +537,8 @@ function viewHome(){
       <div class="row" style="margin-top:10px"><button class="btn ${on?'g':'y'}" onclick="A.confirmMe('${ns.date}','${ns.time}')">${on?'✓ '+t('confirmed'):t('confirm_me')}</button><span class="muted">${a.confirmed.length} ${t('confirmed_n')}</span></div></div>`; }
   if(u){ const soon=DB.shifts.filter(s=>s.memberIds.includes(u.id) && s.date>=todayYMD()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,2);
     for(const s of soon) h+=`<div class="card accent-gold"><b>⭐ ${t('serving')}</b><div>${esc(s.ministry)} · ${fmtDate(s.date,true)} ${fmt12(s.time)}</div></div>`; }
-  h+=`<h2>${t('bulletin')}</h2>
-  <div class="card">${composeBox('')}
+  h+=`<h2>${t('bulletin')}</h2>`;
+  if(can('post')) h+=`<div class="card">${composeBox('')}
     <div class="row wrap"><label class="btn ghost sm">📷 ${t('photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'newPostPhoto')"></label>
     ${can('pastorPost')?`<label class="chip"><input type="checkbox" id="asPastor"> ${t('pastor_msg')}</label><label class="chip"><input type="checkbox" id="pinPost"> ${t('pin')}</label>`:''}
     <button class="btn p right" onclick="A.addPost('')">${t('post')}</button></div><div id="newPostPhoto"></div></div>`;
@@ -721,7 +733,7 @@ function viewSettings(){
   <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   ${can('admin')?`<div class="card"><h3>${t('backup')}</h3><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button></div>`:''}
-  <div class="card muted">${t('version')} 0.3 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  <div class="card muted">${t('version')} 0.3.1 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
   return `<h2>${t('settings')}</h2>
   <div class="card"><label class="f">${t('who_are_you')}</label><select onchange="S.userId=this.value;saveS();render()">${sel(DB.members.map(m=>({v:m.id,l:fullName(m)+' ('+L(CONFIG.roles[m.role]||{})+')'})),S.userId,'—')}</select>
     <div class="hint">${S.lang==='es'?'Demostración: elige quién eres para probar los permisos. En la versión real cada persona entra con su propio enlace.':'Demo: pick who you are to test permissions. In the real version each person signs in with their own link.'}</div></div>
@@ -729,12 +741,12 @@ function viewSettings(){
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   <div class="card"><h3>${t('backup')}</h3><div class="row wrap"><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button><label class="btn ghost">📂 ${t('restore_backup')}<input type="file" accept=".json" hidden onchange="A.restore(this)"></label></div></div>
   <div class="card"><div class="row wrap"><button class="btn ghost" onclick="A.demo()">${t('load_demo')}</button><button class="btn r" onclick="A.wipe()">${t('wipe')}</button></div></div>
-  <div class="card muted">${t('version')} 0.3 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  <div class="card muted">${t('version')} 0.3.1 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
 }
 
 /* === ACTIONS (A.) ===  Everything a button calls. Keep each one small. */
 const A = {
-  go(v){ S.view=v; S.search=''; render(); },
+  go(v){ S.view=v; S.search=''; S._keepDrafts=false; render(); S._keepDrafts=true; },
   tab(g,v){ S.tab[g]=v; render(); },
   toggleLang(){ S.lang=S.lang==='es'?'en':'es'; saveS(); render(); },
   toggleTheme(){ S.theme=S.theme==='dark'?'light':'dark'; saveS(); render(); },
@@ -742,12 +754,12 @@ const A = {
   closeModal(){ document.getElementById('overlay').classList.remove('show'); },
   // --- bulletin
   pickPhoto(input,targetId){ const f=input.files[0]; if(!f) return; shrinkImage(f,url=>{ const el=document.getElementById(targetId); el.dataset.photo=url; el.innerHTML=`<img src="${url}" style="width:100%;border-radius:12px;margin-top:8px">`; }); },
-  addPost(groupId){ const u=me(); const text=document.getElementById('newPost').value.trim(); const text2=(document.getElementById('newPost2')?.value||'').trim(); const photo=document.getElementById('newPostPhoto')?.dataset.photo||null; if(!text&&!photo) return;
+  addPost(groupId){ if(!groupId&&!can('post')){ toast(t('no_permission')); return; } const u=me(); const text=document.getElementById('newPost').value.trim(); const text2=(document.getElementById('newPost2')?.value||'').trim(); const photo=document.getElementById('newPostPhoto')?.dataset.photo||null; if(!text&&!photo) return;
     const isPastor=!groupId&&!!document.getElementById('asPastor')?.checked && can('pastorPost'); const pinned=!groupId&&!!document.getElementById('pinPost')?.checked && can('pastorPost');
-    DB.posts.unshift({id:uid(),authorId:u?u.id:null,authorName:u?fullName(u):'—',isPastor,pinned,text,text2:text2||null,lang:S.lang,groupId:groupId||null,photo,createdAt:Date.now(),reactions:{amen:[],heart:[]},comments:[]}); saveDB(); render(); toast(t('saved')); },
+    DB.posts.unshift({id:uid(),authorId:u?u.id:null,authorName:u?fullName(u):'—',isPastor,pinned,text,text2:text2||null,lang:S.lang,groupId:groupId||null,photo,createdAt:Date.now(),reactions:{amen:[],heart:[]},comments:[]}); document.getElementById('newPost').value=''; if(document.getElementById('newPost2')) document.getElementById('newPost2').value=''; const ph=document.getElementById('newPostPhoto'); if(ph){ delete ph.dataset.photo; ph.innerHTML=''; } saveDB(); render(); toast(t('saved')); },
   delPost(id){ if(!sure('del'))return; DB.posts=DB.posts.filter(p=>p.id!==id); saveDB(); render(); },
   react(id,k){ const u=me(); if(!u)return; const p=DB.posts.find(x=>x.id===id); const arr=p.reactions[k]; const i=arr.indexOf(u.id); i>=0?arr.splice(i,1):arr.push(u.id); saveDB(); render(); },
-  comment(id){ const u=me(); const el=document.getElementById('c-'+id); const text=el.value.trim(); if(!text)return; DB.posts.find(x=>x.id===id).comments.push({name:u?fullName(u):'—',text,at:Date.now()}); saveDB(); render(); },
+  comment(id){ const u=me(); const el=document.getElementById('c-'+id); const text=el.value.trim(); if(!text)return; DB.posts.find(x=>x.id===id).comments.push({name:u?fullName(u):'—',text,at:Date.now()}); el.value=''; saveDB(); render(); },
   translate(id){ const p=DB.posts.find(x=>x.id===id); const tl=S.lang==='es'?'es':'en'; window.open(`https://translate.google.com/?sl=auto&tl=${tl}&text=${encodeURIComponent(p.text)}&op=translate`,'_blank'); },
   viewPhoto(id){ const p=DB.posts.find(x=>x.id===id); A.modal(`<img src="${p.photo}" style="width:100%;border-radius:12px">`); },
   confirmMe(d,tm){ const u=me(); if(!u)return; const a=att(d,tm); const i=a.confirmed.indexOf(u.id); i>=0?a.confirmed.splice(i,1):a.confirmed.push(u.id); saveDB(); render(); },
@@ -785,16 +797,18 @@ const A = {
   // --- kids
   kidsDate(v){ const ss=servicesOn(v); S.kidsSvc={date:v,time:ss[0]?ss[0].time:'12:00'}; render(); },
   kidIn(cid){ const c=DB.children.find(x=>x.id===cid); const hh=DB.households.find(x=>x.id===c.householdId); const parents=(hh?.parentIds||[]).map(id=>fullName(DB.members.find(m=>m.id===id))).filter(Boolean);
-    A.modal(`<h3>${t('checkin')}: ${esc(c.name)}</h3>${c.allergies?`<div class="allergy" style="margin-bottom:8px">⚠ ${t('allergies')}: ${esc(c.allergies)}</div>`:''}<label class="f">${t('dropped_by')}</label><select id="k-by">${sel(parents.map(p=>({v:p,l:p})),parents[0])}</select><div class="hint">${t('parents_only')}</div>
+    A.modal(`<h3>${t('checkin')}: ${esc(c.name)}</h3>${c.allergies?`<div class="allergy" style="margin-bottom:8px">⚠ ${t('allergies')}: ${esc(c.allergies)}</div>`:''}<label class="f">${t('dropped_by')}</label><input type="text" id="k-by" list="k-list" value="${esc(parents[0]||'')}" placeholder="${t('type_name')}" autocomplete="off"><datalist id="k-list">${parents.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><div class="hint">${t('parents_only')}</div>
     <div class="row"><button class="btn g grow" onclick="A.kidInSave('${cid}')">✓ ${t('checkin')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
-  kidInSave(cid){ const by=document.getElementById('k-by').value; if(!by)return; const key=attKey(S.kidsSvc.date,S.kidsSvc.time);
+  kidInSave(cid){ const by=document.getElementById('k-by').value.trim(); if(!by){ toast(t('type_name')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time);
     DB.kids.push({id:uid(),childId:cid,serviceKey:key,group:groupOf(DB.children.find(x=>x.id===cid)),checkInAt:Date.now(),droppedBy:by,checkedInBy:fullName(me()),checkOutAt:null,pickedUpBy:null,checkedOutBy:null}); saveDB(); A.closeModal(); render(); },
   kidOut(cid){ const c=DB.children.find(x=>x.id===cid); const hh=DB.households.find(x=>x.id===c.householdId); const parents=(hh?.parentIds||[]).map(id=>fullName(DB.members.find(m=>m.id===id))).filter(Boolean); const allowed=[...parents,...(c.pickup||[])];
-    A.modal(`<h3>${t('checkout')}: ${esc(c.name)}</h3><label class="f">${t('picked_by')}</label><select id="k-by">${sel(allowed.map(p=>({v:p,l:p})),allowed[0])}</select><div class="hint">${t('only_parents')}</div>
+    A.modal(`<h3>${t('checkout')}: ${esc(c.name)}</h3><label class="f">${t('picked_by')}</label><input type="text" id="k-by" list="k-list" value="${esc(allowed[0]||'')}" placeholder="${t('type_name')}" autocomplete="off" oninput="document.getElementById('k-warn').style.display=[${allowed.map(a=>`'${esc(a).replace(/'/g,"\\'")}'`).join(',')}].map(x=>x.toLowerCase()).includes(this.value.trim().toLowerCase())?'none':'block'"><datalist id="k-list">${allowed.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
+    <div id="k-warn" class="allergy" style="display:${allowed.length?'none':'block'};margin-bottom:8px">⚠ ${t('not_listed')}</div><div class="hint">${t('only_parents')}</div>
     <label class="chip" style="margin:6px 0 12px;display:inline-block"><input type="checkbox" id="k-id"> 🪪 ${t('id_checked')}</label>
     <div class="row"><button class="btn r grow" onclick="A.kidOutSave('${cid}')">✓ ${t('checkout')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
-  kidOutSave(cid){ if(!document.getElementById('k-id').checked){ toast(t('needs_id')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time); const r=DB.kids.find(x=>x.childId===cid&&x.serviceKey===key&&!x.checkOutAt); if(!r)return;
-    Object.assign(r,{checkOutAt:Date.now(),pickedUpBy:document.getElementById('k-by').value,checkedOutBy:fullName(me())}); saveDB(); A.closeModal(); render(); },
+  kidOutSave(cid){ if(!document.getElementById('k-id').checked){ toast(t('needs_id')); return; } const by=document.getElementById('k-by').value.trim(); if(!by){ toast(t('type_name')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time); const r=DB.kids.find(x=>x.childId===cid&&x.serviceKey===key&&!x.checkOutAt); if(!r)return;
+    const unlisted=document.getElementById('k-warn').style.display!=='none';
+    Object.assign(r,{checkOutAt:Date.now(),pickedUpBy:by,unlisted,checkedOutBy:fullName(me())}); saveDB(); A.closeModal(); render(); },
   // --- hymns
   hymnForm(id){ const x=DB.hymns.find(h=>h.id===id)||{title:'',key:'',lyrics:'',tags:'',photo:null};
     A.modal(`<h3>${id?t('edit'):t('add_hymn')}</h3><label class="f">${t('song_title')}</label><input type="text" id="h-title" value="${esc(x.title)}"><label class="f">${t('key')}</label><input type="text" id="h-key" value="${esc(x.key)}" style="width:120px">
