@@ -11,7 +11,7 @@
 =====================================================================
  NUEVO PACTO - Iglesia Evangelica Pentecostes (SCV)
  Single-file church planning app. Mobile first. Spanish default.
- Version 0.3.1  Built by Todd Marshall with Claude.
+ Version 0.3.2  Built by Todd Marshall with Claude.
 
  FILE MAP (search for the === banners):
    === CSS ===              theme variables (light/dark), layout
@@ -631,14 +631,15 @@ function viewKids(){
   if(!ss.length) return h+`<div class="empty">${t('no_service')}</div>`;
   h+=`<div class="tabs">${CONFIG.ageGroups.map(g=>`<button class="${S.kidsGroup===g.id?'on':''}" onclick="S.kidsGroup='${g.id}';render()">${L(g)}</button>`).join('')}</div>`;
   const kids=DB.children.filter(c=>groupOf(c)===S.kidsGroup).sort((a,b)=>a.name.localeCompare(b.name));
-  const recs=DB.kids.filter(r=>r.serviceKey===key); const inNow=kids.filter(c=>{const r=recs.find(x=>x.childId===c.id);return r&&!r.checkOutAt;}).length;
+  const recs=DB.kids.filter(r=>r.serviceKey===key); const lastRec=c=>[...recs].reverse().find(x=>x.childId===c.id); const inNow=kids.filter(c=>{const r=lastRec(c);return r&&!r.checkOutAt;}).length;
   h+=`<div class="row" style="margin-bottom:8px"><span class="chip green">${inNow} ${t('in_class')}</span><button class="btn sm ghost right" onclick="A.childForm('','')">＋ ${t('add_kid_here')}</button></div><div class="card list">`;
   if(!kids.length) h+=`<div class="empty">${t('no_kids')}</div>`;
-  for(const c of kids){ const r=recs.find(x=>x.childId===c.id); const st=!r?'none':(r.checkOutAt?'out':'in'); const hh=DB.households.find(x=>x.id===c.householdId);
+  for(const c of kids){ const r=lastRec(c); const st=!r?'none':(r.checkOutAt?'out':'in'); const hh=DB.households.find(x=>x.id===c.householdId); const n=recs.filter(x=>x.childId===c.id).length;
     h+=`<div class="item"><div class="avatar ${st==='in'?'':'blue'}" style="${st==='in'?'background:#2e7d32':''}">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b> <span class="muted">${ageOf(c.birthdate)} ${t('age')}</span>
       <div class="muted">${esc(hh?hh.name:'')}${r?` · ${t('checkin')} ${new Date(r.checkInAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} (${esc(r.droppedBy)})`:''}${r&&r.checkOutAt?` · ${t('checkout')} (${esc(r.pickedUpBy)})`:''}</div>
       ${c.allergies?`<span class="allergy">⚠ ${esc(c.allergies)}</span>`:''}</div>
-      ${st==='none'?`<button class="btn sm g" onclick="A.kidIn('${c.id}')">${t('checkin')}</button>`:st==='in'?`<button class="btn sm r" onclick="A.kidOut('${c.id}')">${t('checkout')}</button>`:`<span class="chip">${t('out_now')}</span>`}</div>`; }
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><button class="btn sm ghost" onclick="A.moveClass('${c.id}')" title="${t('class_override')}">⇄</button>
+      ${st==='in'?`<button class="btn sm r" onclick="A.kidOut('${c.id}')">${t('checkout')}</button>`:`<button class="btn sm g" onclick="A.kidIn('${c.id}')">${st==='out'?'↩ ':''}${t('checkin')}</button>`}</div></div>`; }
   return h+'</div>';
 }
 function myKidsCard(){ const u=me(); if(!u||!u.householdId) return ''; const kids=DB.children.filter(c=>c.householdId===u.householdId); if(!kids.length) return '';
@@ -733,7 +734,7 @@ function viewSettings(){
   <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   ${can('admin')?`<div class="card"><h3>${t('backup')}</h3><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button></div>`:''}
-  <div class="card muted">${t('version')} 0.3.1 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  <div class="card muted">${t('version')} 0.3.2 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
   return `<h2>${t('settings')}</h2>
   <div class="card"><label class="f">${t('who_are_you')}</label><select onchange="S.userId=this.value;saveS();render()">${sel(DB.members.map(m=>({v:m.id,l:fullName(m)+' ('+L(CONFIG.roles[m.role]||{})+')'})),S.userId,'—')}</select>
     <div class="hint">${S.lang==='es'?'Demostración: elige quién eres para probar los permisos. En la versión real cada persona entra con su propio enlace.':'Demo: pick who you are to test permissions. In the real version each person signs in with their own link.'}</div></div>
@@ -741,7 +742,7 @@ function viewSettings(){
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   <div class="card"><h3>${t('backup')}</h3><div class="row wrap"><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button><label class="btn ghost">📂 ${t('restore_backup')}<input type="file" accept=".json" hidden onchange="A.restore(this)"></label></div></div>
   <div class="card"><div class="row wrap"><button class="btn ghost" onclick="A.demo()">${t('load_demo')}</button><button class="btn r" onclick="A.wipe()">${t('wipe')}</button></div></div>
-  <div class="card muted">${t('version')} 0.3.1 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  <div class="card muted">${t('version')} 0.3.2 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
 }
 
 /* === ACTIONS (A.) ===  Everything a button calls. Keep each one small. */
@@ -806,9 +807,14 @@ const A = {
     <div id="k-warn" class="allergy" style="display:${allowed.length?'none':'block'};margin-bottom:8px">⚠ ${t('not_listed')}</div><div class="hint">${t('only_parents')}</div>
     <label class="chip" style="margin:6px 0 12px;display:inline-block"><input type="checkbox" id="k-id"> 🪪 ${t('id_checked')}</label>
     <div class="row"><button class="btn r grow" onclick="A.kidOutSave('${cid}')">✓ ${t('checkout')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
-  kidOutSave(cid){ if(!document.getElementById('k-id').checked){ toast(t('needs_id')); return; } const by=document.getElementById('k-by').value.trim(); if(!by){ toast(t('type_name')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time); const r=DB.kids.find(x=>x.childId===cid&&x.serviceKey===key&&!x.checkOutAt); if(!r)return;
+  kidOutSave(cid){ if(!document.getElementById('k-id').checked){ toast(t('needs_id')); return; } const by=document.getElementById('k-by').value.trim(); if(!by){ toast(t('type_name')); return; } const key=attKey(S.kidsSvc.date,S.kidsSvc.time); const r=[...DB.kids].reverse().find(x=>x.childId===cid&&x.serviceKey===key&&!x.checkOutAt); if(!r)return;
     const unlisted=document.getElementById('k-warn').style.display!=='none';
     Object.assign(r,{checkOutAt:Date.now(),pickedUpBy:by,unlisted,checkedOutBy:fullName(me())}); saveDB(); A.closeModal(); render(); },
+  moveClass(cid){ const c=DB.children.find(x=>x.id===cid); const cur=groupOf(c);
+    A.modal(`<h3>⇄ ${t('class_override')}: ${esc(c.name)}</h3><div class="muted" style="margin-bottom:6px">${ageOf(c.birthdate)!=null?ageOf(c.birthdate)+' '+t('age'):''}</div>
+    <select id="mc-class">${sel(CONFIG.ageGroups.map(g=>({v:g.id,l:L(g)})),cur)}</select><label class="chip" style="display:inline-block;margin-bottom:12px"><input type="checkbox" id="mc-auto" ${c.classId?'':'checked'}> ${t('auto_by_age')}</label>
+    <div class="row"><button class="btn p grow" onclick="A.moveClassSave('${cid}')">${t('save')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  moveClassSave(cid){ const c=DB.children.find(x=>x.id===cid); const auto=document.getElementById('mc-auto').checked; c.classId=auto?null:document.getElementById('mc-class').value; S.kidsGroup=groupOf(c); saveDB(); A.closeModal(); render(); toast(t('saved')); },
   // --- hymns
   hymnForm(id){ const x=DB.hymns.find(h=>h.id===id)||{title:'',key:'',lyrics:'',tags:'',photo:null};
     A.modal(`<h3>${id?t('edit'):t('add_hymn')}</h3><label class="f">${t('song_title')}</label><input type="text" id="h-title" value="${esc(x.title)}"><label class="f">${t('key')}</label><input type="text" id="h-key" value="${esc(x.key)}" style="width:120px">
