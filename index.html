@@ -11,7 +11,7 @@
 =====================================================================
  NUEVO PACTO - Iglesia Evangelica Pentecostes (SCV)
  Single-file church planning app. Mobile first. Spanish default.
- Version 0.3.2  Built by Todd Marshall with Claude.
+ Version 0.4  Built by Todd Marshall with Claude.
 
  FILE MAP (search for the === banners):
    === CSS ===              theme variables (light/dark), layout
@@ -219,6 +219,10 @@ es:{
   age:'años', in_now:'Dentro', out_now:'Salió', not_here:'No ha llegado', parents_only:'Padres de esta familia',
   translate_hint:'Se abre el traductor de Google con el texto.', upload_hint:'Toca para elegir una foto',
   day_mon:'L', day_tue:'M', day_wed:'X', day_thu:'J', day_fri:'V', day_sat:'S', day_sun:'D',
+  group_leads:'Líderes del grupo', lead_mark:'líder', emoji:'Ícono', group_cal:'Calendario del grupo', public_event:'Toda la iglesia', for_group:'Para el grupo',
+  import_events:'Importar eventos', events_import_hint:'Pega las filas desde Excel con encabezados: Título, Fecha, Hora, Lugar, Detalles, Grupo (opcional).',
+  kids_classes:'Clases de niños', class_name_es:'Nombre (español)', class_name_en:'Nombre (inglés)', age_min:'Edad mínima', age_max:'Edad máxima', add_class:'Agregar clase', reset_classes:'Volver a las clases originales',
+  upcoming:'Próximos', no_upcoming:'Sin eventos próximos.',
   groups:'Grupos', group:'Grupo', my_groups:'Mis grupos', new_group:'Nuevo grupo', group_name:'Nombre del grupo', group_members:'Integrantes',
   only_members:'Solo los integrantes de este grupo ven esta página.', write_group_post:'Escribe al grupo...', color:'Color',
   add_english:'+ English', add_spanish:'+ Español', second_lang_hint:'Opcional: escribe el mismo mensaje en el otro idioma y cada persona lo verá en el suyo.',
@@ -275,6 +279,10 @@ en:{
   age:'yrs', in_now:'In', out_now:'Out', not_here:'Not arrived', parents_only:'Parents in this family',
   translate_hint:'Opens Google Translate with the text.', upload_hint:'Tap to choose a photo',
   day_mon:'M', day_tue:'T', day_wed:'W', day_thu:'T', day_fri:'F', day_sat:'S', day_sun:'S',
+  group_leads:'Group leads', lead_mark:'lead', emoji:'Icon', group_cal:'Group calendar', public_event:'Whole church', for_group:'For group',
+  import_events:'Import events', events_import_hint:'Paste rows from Excel with headers: Title, Date, Time, Place, Details, Group (optional).',
+  kids_classes:'Kids classes', class_name_es:'Name (Spanish)', class_name_en:'Name (English)', age_min:'Min age', age_max:'Max age', add_class:'Add class', reset_classes:'Back to the original classes',
+  upcoming:'Upcoming', no_upcoming:'No upcoming events.',
   groups:'Groups', group:'Group', my_groups:'My groups', new_group:'New group', group_name:'Group name', group_members:'Members',
   only_members:'Only members of this group see this page.', write_group_post:'Write to the group...', color:'Color',
   add_english:'+ English', add_spanish:'+ Español', second_lang_hint:'Optional: write the same message in the other language and each person sees their own.',
@@ -307,7 +315,7 @@ const emptyDB = () => ({
   kids:[],         // check-in records
   groups:[],       // {id,name,color,memberIds}
   adminMsgs:[],    // private messages to the administrator
-  hymns:[], setlist:[], bible:{},  // bible: "YYYY-MM" -> {book, theme, teacher, weeks:[]}
+  hymns:[], setlist:[], ageGroups:null, bible:{},  // bible: "YYYY-MM" -> {book, theme, teacher, weeks:[]}
 });
 let DB = emptyDB();
 function loadDB(){ try{ const raw=localStorage.getItem(DB_KEY); if(raw) DB=Object.assign(emptyDB(), JSON.parse(raw)); }catch(e){ console.warn('load failed',e); } }
@@ -320,9 +328,11 @@ function saveDB(){ saveLocal(); if(ONLINE && sb && PROFILE && PROFILE.approved) 
 const ONLINE = !!(CONFIG.supabase.url && CONFIG.supabase.anonKey && !CONFIG.supabase.url.startsWith('__'));
 let sb=null, SESSION=null, PROFILE=null, SYNCED={}, PROFILES=[];
 const SYNC_MAP={
-  members:{table:'members'}, households:{table:'households'}, children:{table:'children'}, events:{table:'events'}, shifts:{table:'shifts'},
+  members:{table:'members'}, households:{table:'households'}, children:{table:'children'}, shifts:{table:'shifts'},
   kids:{table:'kids_checkins'}, hymns:{table:'hymns'}, adminMsgs:{table:'admin_msgs'},
-  groups:{table:'groups',cols:r=>({member_ids:r.memberIds||[]})},
+  groups:{table:'groups',cols:r=>({member_ids:r.memberIds||[],lead_ids:r.leadIds||[]})},
+  events:{table:'events',cols:r=>({group_id:r.groupId||null})},
+  ageGroups:{table:'settings',single:true},
   posts:{table:'posts',cols:r=>({group_id:r.groupId||null,author_member:r.authorId||null})},
   prayers:{table:'prayers',cols:r=>({author_member:r.authorMemberId||null})},
   attendance:{table:'attendance',keyed:true}, bible:{table:'bible',keyed:true},
@@ -333,7 +343,7 @@ function rowsOf(col){ const m=SYNC_MAP[col]; const v=DB[col];
   if(m.keyed) return Object.entries(v).map(([k,d])=>({id:k,data:d}));
   return v.map(r=>({id:r.id,data:r,...(m.cols?m.cols(r):{})})); }
 function applyRows(col,rows){ const m=SYNC_MAP[col];
-  if(m.single){ const r=rows.find(x=>x.id===col); DB[col]=r?r.data:[]; }
+  if(m.single){ const r=rows.find(x=>x.id===col); DB[col]=r?r.data:(col==='setlist'?[]:null); }
   else if(m.keyed){ DB[col]={}; rows.forEach(r=>DB[col][r.id]=r.data); }
   else DB[col]=rows.map(r=>r.data);
   SYNCED[col]={}; rowsOf(col).forEach(r=>SYNCED[col][r.id]=JSON.stringify(r)); }
@@ -363,7 +373,7 @@ async function afterLogin(){ const {data}=await sb.from('profiles').select('*').
   render(); }
 function renderSoft(){ if(document.getElementById('overlay').classList.contains('show')){ S.pendingRender=true; return; } render(); }
 document.addEventListener('focusout',()=>{ if(S.pendingRender){ S.pendingRender=false; setTimeout(()=>{ if(!document.getElementById('overlay').classList.contains('show')) render(); },150); } });
-const S = { lang:'es', theme:'light', view:'home', userId:null, tab:{}, calMonth:null, calSel:null, attDate:null, attTime:null, kidsGroup:'g1', search:'' };
+const S = { lang:'es', theme:'light', view:'home', userId:null, tab:{}, calMonth:null, calSel:null, attDate:null, attTime:null, kidsGroup:null, search:'' };
 const S_KEY = 'nuevopacto.settings.v1';
 function loadS(){ try{ Object.assign(S, JSON.parse(localStorage.getItem(S_KEY)||'{}')); }catch(e){} }
 function saveS(){ localStorage.setItem(S_KEY, JSON.stringify({lang:S.lang, theme:S.theme, userId:S.userId})); }
@@ -400,11 +410,11 @@ function loadDemo(){
     {id:uid(),householdId:hhTorres,name:'Valeria Torres',birthdate:'2013-01-30',allergies:'Lácteos',pickup:['Tío Roberto']},
   ];
   DB.groups=[
-    {id:uid(),name:'Alabanza',color:'gold',memberIds:[byName('Luis'),byName('Elena')]},
-    {id:uid(),name:'Ujieres',color:'red',memberIds:[byName('Carlos'),byName('Pedro')]},
-    {id:uid(),name:'Oración',color:'purple',memberIds:[byName('Ana'),byName('Pastora')]},
-    {id:uid(),name:'Niños',color:'blue',memberIds:[byName('María'),byName('Lucía')]},
-    {id:uid(),name:'Jóvenes',color:'purple',memberIds:[byName('Miguel')]},
+    {id:uid(),name:'Alabanza',color:'gold',emoji:'🎵',memberIds:[byName('Luis'),byName('Elena')],leadIds:[byName('Luis')]},
+    {id:uid(),name:'Ujieres',color:'red',emoji:'🚪',memberIds:[byName('Carlos'),byName('Pedro')],leadIds:[byName('Carlos')]},
+    {id:uid(),name:'Oración',color:'purple',emoji:'🙏',memberIds:[byName('Ana'),byName('Pastora')],leadIds:[byName('Ana')]},
+    {id:uid(),name:'Niños',color:'blue',emoji:'🧒',memberIds:[byName('María'),byName('Lucía')],leadIds:[byName('María')]},
+    {id:uid(),name:'Jóvenes',color:'purple',emoji:'🔥',memberIds:[byName('Miguel')],leadIds:[]},
   ];
   const now=Date.now();
   DB.adminMsgs=[{id:uid(),fromId:byName('Pastor'),fromName:'Pastor Cardona',text:'Juan, por favor dale acceso de maestra a Lucía.',at:now-3600e3*8,read:false}];
@@ -422,7 +432,9 @@ function loadDemo(){
               {id:uid(),name:'Anónimo',text:'Por trabajo.',createdAt:now-86400e3*3,answered:false}];
   const ymd=d=>d.toISOString().slice(0,10);
   const d1=new Date(); d1.setDate(d1.getDate()+9);
-  DB.events=[{id:uid(),title:'Noche de Jóvenes: Fogata',date:ymd(d1),time:'18:30',place:'Patio de la iglesia',details:'Traer sudadera. Habrá cena.',ministry:'Jóvenes',color:'purple',rsvp:[byName('Miguel')]}];
+  const d2=new Date(); d2.setDate(d2.getDate()+3);
+  DB.events=[{id:uid(),title:'Noche de Jóvenes: Fogata',date:ymd(d1),time:'18:30',place:'Patio de la iglesia',details:'Traer sudadera. Habrá cena.',ministry:'Jóvenes',color:'purple',rsvp:[byName('Miguel')]},
+    {id:uid(),title:'Ensayo extra: cantos de Navidad',date:ymd(d2),time:'19:30',place:'Santuario',details:'',ministry:'',color:'gold',rsvp:[],groupId:DB.groups[0].id}];
   DB.shifts=[{id:uid(),date:nextService().date,time:nextService().time,ministry:'Ujieres',memberIds:[byName('Carlos'),byName('Pedro')]}];
   DB.children[2].classId='g2'; // demo: Mateo kept with the 4-7 class by choice
   DB.hymns=[{id:uid(),title:'Cuán Grande Es Él',key:'G',photo:null,lyrics:'[G]Señor mi Dios, al con[C]templar los [G]cielos\nEl firma[D]mento y las es[G]trellas mil',tags:'adoración',createdAt:now},
@@ -449,11 +461,15 @@ function fmtDate(ymd,long){ const d=parseYMD(ymd); const m=t('months')[d.getMont
 const fmt12=hm=>{let [h,m]=hm.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return `${h}:${String(m).padStart(2,'0')}${ap}`;};
 const ago=ms=>{const h=Math.floor((Date.now()-ms)/3600e3);if(h<1)return S.lang==='es'?'ahora':'now';if(h<24)return h+'h';return Math.floor(h/24)+'d';};
 function ageOf(b){ if(!b)return null; const d=parseYMD(b),n=new Date(); let a=n.getFullYear()-d.getFullYear(); if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))a--; return a; }
-function groupOf(child){ if(child.classId) return child.classId; const a=ageOf(child.birthdate)??0; return (CONFIG.ageGroups.find(g=>a>=g.min&&a<=g.max)||CONFIG.ageGroups[CONFIG.ageGroups.length-1]).id; }
+const AG=()=>(Array.isArray(DB.ageGroups)&&DB.ageGroups.length)?DB.ageGroups:CONFIG.ageGroups;
+function groupOf(child){ if(child.classId) return child.classId; const a=ageOf(child.birthdate)??0; return (AG().find(g=>a>=g.min&&a<=g.max)||AG()[AG().length-1]).id; }
 const me=()=>ONLINE ? (PROFILE&&PROFILE.member_id ? DB.members.find(m=>m.id===PROFILE.member_id)||null : null) : (DB.members.find(m=>m.id===S.userId)||null);
 function can(p){ if(ONLINE){ if(!PROFILE||!PROFILE.approved) return false; return (CONFIG.roles[PROFILE.role]?.can||[]).includes(p); } const u=me(); if(!u) return false; return (CONFIG.roles[u.role]?.can||[]).includes(p); }
 const myGroups=()=>{const u=me(); return DB.groups.filter(g=>u&&(g.memberIds.includes(u.id)||can('admin')));};
-const inGroup=g=>{const u=me(); return !!u&&(g.memberIds.includes(u.id)||can('admin'));};
+const inGroup=g=>{const u=me(); return !!u&&(g.memberIds.includes(u.id)||(g.leadIds||[]).includes(u.id)||can('admin'));};
+const leadsGroup=g=>{const u=me(); return !!u&&((g.leadIds||[]).includes(u.id)||can('edit'));};   // can manage this group's posts, events, members
+const groupsICanManage=()=>DB.groups.filter(leadsGroup);
+const gLabel=g=>g?`${g.emoji||'👥'} ${g.name}`:'';
 const postText=p=>(p.text2&&p.lang&&p.lang!==S.lang)?p.text2:p.text;
 function chordSheet(src){ // "[D]El firma[G]mento" -> chords on the line above the words
   return src.split('\n').map(line=>{ if(!/\[[^\]]+\]/.test(line)) return `<div>${esc(line)||'&nbsp;'}</div>`;
@@ -465,7 +481,8 @@ const initials=m=>((m.first||'?')[0]+(m.last||' ')[0]).toUpperCase();
 // Weekly events that fall on a given date (YYYY-MM-DD)
 function weeklyOn(ymd){ const d=parseYMD(ymd); const nth=Math.ceil(d.getDate()/7);
   return CONFIG.weekly.filter(w=>w.dow===d.getDay() && (!w.nth || w.nth===nth)).map(w=>({...w,date:ymd,title:L(w),weekly:true})); }
-function eventsOn(ymd){ return [...weeklyOn(ymd), ...DB.events.filter(e=>e.date===ymd).map(e=>({...e,color:e.color||'o'}))].sort((a,b)=>a.time.localeCompare(b.time)); }
+function visibleEvent(e){ if(!e.groupId) return true; const g=DB.groups.find(x=>x.id===e.groupId); return !!g&&inGroup(g); }
+function eventsOn(ymd){ return [...weeklyOn(ymd), ...DB.events.filter(e=>e.date===ymd&&visibleEvent(e)).map(e=>({...e,color:e.color||(e.groupId?(DB.groups.find(x=>x.id===e.groupId)||{}).color||'o':'o')}))].sort((a,b)=>a.time.localeCompare(b.time)); }
 function servicesOn(ymd){ return weeklyOn(ymd).filter(w=>w.kind==='service'); }
 function nextService(){ const now=new Date(); for(let i=0;i<8;i++){ const d=new Date(now); d.setDate(d.getDate()+i); const y=toYMD(d);
   for(const s of servicesOn(y)){ const end=new Date(d); const [h,m]=s.time.split(':'); end.setHours(+h+2,+m); if(end>now) return {date:y,time:s.time,title:s.title}; } } return null; }
@@ -570,12 +587,13 @@ function viewCal(){
   let h=`<div class="row" style="margin-bottom:8px"><button class="btn sm" onclick="A.calMove(-1)">‹</button><h2 class="grow" style="text-align:center;margin:0">${t('months')[m-1]} ${y}</h2><button class="btn sm" onclick="A.calMove(1)">›</button></div>
   <div class="cal">${['day_mon','day_tue','day_wed','day_thu','day_fri','day_sat','day_sun'].map(k=>`<div class="dh">${t(k)}</div>`).join('')}
   ${cells.map(c=>c?`<div class="d ${c===todayYMD()?'today':''} ${c===S.calSel?'sel':''}" onclick="A.calPick('${c}')">${+c.slice(8)}<div class="dots">${[...new Set(eventsOn(c).map(e=>e.color))].slice(0,4).map(cl=>`<span class="dot ${cl}"></span>`).join('')}</div></div>`:'<div></div>').join('')}</div>
-  <div class="row" style="margin:14px 0 8px"><h3 style="margin:0" class="grow">${t('events_on')} ${fmtDate(S.calSel,true)}</h3>${can('edit')?`<button class="btn sm p" onclick="A.eventForm()">＋ ${t('add_event')}</button>`:''}</div>`;
+  <div class="row" style="margin:14px 0 8px"><h3 style="margin:0" class="grow">${t('events_on')} ${fmtDate(S.calSel,true)}</h3>${(can('edit')||groupsICanManage().length)?`<button class="btn sm p" onclick="A.eventForm()">＋ ${t('add_event')}</button>`:''}${can('edit')?`<button class="btn sm ghost" onclick="A.eventsImportForm()">📥</button>`:''}</div>`;
   const evs=eventsOn(S.calSel); if(!evs.length) h+=`<div class="empty">${t('none')}</div>`;
   const u=me();
   for(const e of evs){ const going=e.rsvp||[]; const on=u&&going.includes(u.id);
-    h+=`<div class="card accent-${e.color}"><div class="row"><div class="grow"><b>${esc(e.title)}</b><div class="muted">${fmt12(e.time)}${e.place?' · '+esc(e.place):''}${e.weekly?' · '+t('weekly_event'):''}</div>${e.details?`<div style="margin-top:4px">${esc(e.details)}</div>`:''}</div>
-      ${!e.weekly&&can('edit')?`<button class="btn sm ghost" onclick="A.eventForm('${e.id}')">✎</button>`:''}</div>
+    const eg=e.groupId?DB.groups.find(x=>x.id===e.groupId):null;
+    h+=`<div class="card accent-${e.color}"><div class="row"><div class="grow"><b>${esc(e.title)}</b>${eg?` <span class="chip ${eg.color||'blue'}">${esc(gLabel(eg))}</span>`:''}<div class="muted">${fmt12(e.time)}${e.place?' · '+esc(e.place):''}${e.weekly?' · '+t('weekly_event'):''}</div>${e.details?`<div style="margin-top:4px">${esc(e.details)}</div>`:''}</div>
+      ${!e.weekly&&(can('edit')||(eg&&leadsGroup(eg)))?`<button class="btn sm ghost" onclick="A.eventForm('${e.id}')">✎</button>`:''}</div>
       <div class="row wrap" style="margin-top:8px">${!e.weekly?`<button class="btn sm ${on?'g':'y'}" onclick="A.rsvp('${e.id}')">${on?'✓ ':''}${t('rsvp')}</button><span class="muted">${going.length} ${t('going')}</span>`:''}
       <button class="btn sm ghost right" onclick="A.ics('${e.date}','${e.time}','${esc(e.title)}','${esc(e.place||'')}')">📲 ${t('add_to_phone')}</button></div></div>`; }
   return h;
@@ -629,7 +647,8 @@ function viewKids(){
   let h=`<h2>${t('kids_checkin')}</h2><div class="card"><div class="row"><div class="grow"><label class="f">${t('date')}</label><input type="date" value="${cur.date}" onchange="A.kidsDate(this.value)"></div>
     <div class="grow"><label class="f">${t('service')}</label><select onchange="S.kidsSvc={...S.kidsSvc,time:this.value};render()">${sel(ss.map(s=>({v:s.time,l:fmt12(s.time)})),cur.time)}</select></div></div></div>`;
   if(!ss.length) return h+`<div class="empty">${t('no_service')}</div>`;
-  h+=`<div class="tabs">${CONFIG.ageGroups.map(g=>`<button class="${S.kidsGroup===g.id?'on':''}" onclick="S.kidsGroup='${g.id}';render()">${L(g)}</button>`).join('')}</div>`;
+  if(!S.kidsGroup||!AG().find(g=>g.id===S.kidsGroup)) S.kidsGroup=AG()[0].id;
+  h+=`<div class="tabs">${AG().map(g=>`<button class="${S.kidsGroup===g.id?'on':''}" onclick="S.kidsGroup='${g.id}';render()">${L(g)}</button>`).join('')}</div>`;
   const kids=DB.children.filter(c=>groupOf(c)===S.kidsGroup).sort((a,b)=>a.name.localeCompare(b.name));
   const recs=DB.kids.filter(r=>r.serviceKey===key); const lastRec=c=>[...recs].reverse().find(x=>x.childId===c.id); const inNow=kids.filter(c=>{const r=lastRec(c);return r&&!r.checkOutAt;}).length;
   h+=`<div class="row" style="margin-bottom:8px"><span class="chip green">${inNow} ${t('in_class')}</span><button class="btn sm ghost right" onclick="A.childForm('','')">＋ ${t('add_kid_here')}</button></div><div class="card list">`;
@@ -643,7 +662,7 @@ function viewKids(){
   return h+'</div>';
 }
 function myKidsCard(){ const u=me(); if(!u||!u.householdId) return ''; const kids=DB.children.filter(c=>c.householdId===u.householdId); if(!kids.length) return '';
-  return `<div class="card"><h3>${t('children')}</h3><div class="list">${kids.map(c=>{const r=[...DB.kids].reverse().find(x=>x.childId===c.id);const g=CONFIG.ageGroups.find(g=>g.id===groupOf(c));
+  return `<div class="card"><h3>${t('children')}</h3><div class="list">${kids.map(c=>{const r=[...DB.kids].reverse().find(x=>x.childId===c.id);const g=AG().find(g=>g.id===groupOf(c));
     return `<div class="item"><div class="avatar">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b><div class="muted">${L(g)}${r?` · ${r.checkOutAt?t('out_now'):t('in_now')}`:''}</div></div></div>`;}).join('')}</div></div>`; }
 
 function viewMore(){
@@ -654,17 +673,21 @@ function viewMore(){
 }
 
 function viewGroups(){
-  const gs=myGroups(); const ed=can('admin')||can('edit');
+  const gs=myGroups(); const ed=can('edit');
   return `<div class="row"><h2 class="grow">${t('my_groups')}</h2>${ed?`<button class="btn sm p" onclick="A.groupForm()">＋ ${t('new_group')}</button>`:''}</div>
-  ${gs.length?gs.map(g=>`<div class="card accent-${g.color||'blue'}" onclick="S.groupId='${g.id}';A.go('group')"><div class="row"><div class="grow"><b>${esc(g.name)}</b><div class="muted">${g.memberIds.length} ${t('group_members').toLowerCase()} · ${DB.posts.filter(p=>p.groupId===g.id).length} ${t('bulletin').toLowerCase()}</div></div><span>›</span></div></div>`).join(''):`<div class="empty">${t('none')}</div>`}
+  ${gs.length?gs.map(g=>`<div class="card accent-${g.color||'blue'}" onclick="S.groupId='${g.id}';A.go('group')"><div class="row"><div class="avatar ${g.color||'blue'}" style="font-size:1.3rem">${esc(g.emoji||'👥')}</div><div class="grow"><b>${esc(g.name)}</b><div class="muted">${g.memberIds.length} ${t('group_members').toLowerCase()} · ${DB.posts.filter(p=>p.groupId===g.id).length} ${t('bulletin').toLowerCase()} · ${DB.events.filter(e=>e.groupId===g.id&&e.date>=todayYMD()).length} ${t('upcoming').toLowerCase()}</div></div><span>›</span></div></div>`).join(''):`<div class="empty">${t('none')}</div>`}
   ${!can('admin')&&DB.groups.length>gs.length?`<div class="muted">${t('only_members')}</div>`:''}`;
 }
 function viewGroup(){
   const g=DB.groups.find(x=>x.id===S.groupId); if(!g) return viewGroups();
-  let h=`<div class="row"><button class="btn sm ghost" onclick="A.go('groups')">‹</button><h2 class="grow" style="margin:0">${esc(g.name)}</h2>${can('admin')||can('edit')?`<button class="btn sm ghost" onclick="A.groupForm('${g.id}')">✎</button>`:''}</div>`;
+  let h=`<div class="row"><button class="btn sm ghost" onclick="A.go('groups')">‹</button><h2 class="grow" style="margin:0">${esc(gLabel(g))}</h2>${leadsGroup(g)?`<button class="btn sm ghost" onclick="A.groupForm('${g.id}')">✎</button>`:''}</div>`;
   if(!inGroup(g)) return h+`<div class="card"><div class="muted">${t('only_members')}</div></div>`;
-  h+=`<div class="card accent-${g.color||'blue'}"><div class="muted">${t('group_members')}</div>${g.memberIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')||'—'}</div>
-  <div class="card">${composeBox(g.id)}<div class="row wrap"><label class="btn ghost sm">📷 ${t('photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'newPostPhoto')"></label><button class="btn p right" onclick="A.addPost('${g.id}')">${t('post')}</button></div><div id="newPostPhoto"></div></div>`;
+  const leads=(g.leadIds||[]).map(id=>fullName(DB.members.find(m=>m.id===id))).filter(Boolean);
+  h+=`<div class="card accent-${g.color||'blue'}">${leads.length?`<div class="muted">${t('group_leads')}</div><div>⭐ ${esc(leads.join(', '))}</div>`:''}<div class="muted" style="margin-top:${leads.length?6:0}px">${t('group_members')}</div>${g.memberIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')||'—'}</div>`;
+  const up=DB.events.filter(e=>e.groupId===g.id&&e.date>=todayYMD()).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,8);
+  h+=`<div class="card"><div class="row"><h3 class="grow" style="margin:0">📅 ${t('group_cal')}</h3>${leadsGroup(g)?`<button class="btn sm p" onclick="A.eventForm('', '${g.id}')">＋ ${t('add_event')}</button>`:''}</div>
+    ${up.length?up.map(e=>`<div class="row" style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="grow"><b>${esc(e.title)}</b><div class="muted">${fmtDate(e.date,true)} · ${fmt12(e.time)}${e.place?' · '+esc(e.place):''}</div></div>${leadsGroup(g)?`<button class="btn sm ghost" onclick="A.eventForm('${e.id}')">✎</button>`:''}<button class="btn sm ghost" onclick="S.calSel='${e.date}';S.calMonth='${e.date.slice(0,7)}';A.go('cal')">›</button></div>`).join(''):`<div class="muted">${t('no_upcoming')}</div>`}</div>`;
+  h+=`<div class="card">${composeBox(g.id)}<div class="row wrap"><label class="btn ghost sm">📷 ${t('photo')}<input type="file" accept="image/*" hidden onchange="A.pickPhoto(this,'newPostPhoto')"></label><button class="btn p right" onclick="A.addPost('${g.id}')">${t('post')}</button></div><div id="newPostPhoto"></div></div>`;
   const posts=DB.posts.filter(p=>p.groupId===g.id).sort((a,b)=>b.createdAt-a.createdAt);
   return h+(posts.length?posts.map(postCard).join(''):`<div class="empty">${t('none')}</div>`);
 }
@@ -720,12 +743,14 @@ function viewMembers(){
     h+=`${ed?`<button class="btn sm p" style="margin-bottom:8px" onclick="A.hhForm()">＋ ${t('new_household')}</button>`:''}`;
     for(const hh of [...DB.households].sort((a,b)=>a.name.localeCompare(b.name))){ const kids=DB.children.filter(c=>c.householdId===hh.id);
       h+=`<div class="card"><div class="row"><div class="grow"><b>${esc(hh.name)}</b><div class="muted">${t('parents')}: ${hh.parentIds.map(id=>esc(fullName(DB.members.find(m=>m.id===id)))).filter(Boolean).join(', ')||'—'}</div></div>${ed?`<button class="btn sm ghost" onclick="A.hhForm('${hh.id}')">✎</button>`:''}</div>
-        <div class="list">${kids.map(c=>`<div class="item" ${ed?`onclick="A.childForm('${hh.id}','${c.id}')"`:''}><div class="avatar purple">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b> <span class="muted">${ageOf(c.birthdate)} ${t('age')} · ${L(CONFIG.ageGroups.find(g=>g.id===groupOf(c)))}</span>${c.allergies?`<div><span class="allergy">⚠ ${esc(c.allergies)}</span></div>`:''}</div></div>`).join('')}</div>
+        <div class="list">${kids.map(c=>`<div class="item" ${ed?`onclick="A.childForm('${hh.id}','${c.id}')"`:''}><div class="avatar purple">${esc(c.name[0])}</div><div class="grow"><b>${esc(c.name)}</b> <span class="muted">${ageOf(c.birthdate)} ${t('age')} · ${L(AG().find(g=>g.id===groupOf(c)))}</span>${c.allergies?`<div><span class="allergy">⚠ ${esc(c.allergies)}</span></div>`:''}</div></div>`).join('')}</div>
         ${ed?`<button class="btn sm ghost" onclick="A.childForm('${hh.id}')">＋ ${t('add_child')}</button>`:''}</div>`; }
   }
   return h;
 }
 
+function classesCard(){ return `<div class="card"><h3>${t('kids_classes')}</h3><div class="list">${AG().map(g=>`<div class="item"><div class="grow"><b>${esc(g.es)}</b> <span class="muted">/ ${esc(g.en)} · ${g.min}-${g.max} ${t('age')}</span></div></div>`).join('')}</div>
+  <div class="row wrap" style="margin-top:8px"><button class="btn sm p" onclick="A.classesForm()">✎ ${t('edit')}</button></div></div>`; }
 function viewSettings(){
   if(ONLINE) return `<h2>${t('settings')}</h2>
   <div class="card"><h3>${t('account')}</h3><div>${esc(fullName(me())||PROFILE.display_name||'')} <span class="muted">${esc(SESSION.user.email)}</span> · <span class="chip">${L(CONFIG.roles[PROFILE.role]||{})}</span></div>
@@ -734,15 +759,17 @@ function viewSettings(){
   <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   ${can('admin')?`<div class="card"><h3>${t('backup')}</h3><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button></div>`:''}
-  <div class="card muted">${t('version')} 0.3.2 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  ${can('admin')?classesCard():''}
+  <div class="card muted">${t('version')} 0.4 · ${t('online')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
   return `<h2>${t('settings')}</h2>
   <div class="card"><label class="f">${t('who_are_you')}</label><select onchange="S.userId=this.value;saveS();render()">${sel(DB.members.map(m=>({v:m.id,l:fullName(m)+' ('+L(CONFIG.roles[m.role]||{})+')'})),S.userId,'—')}</select>
     <div class="hint">${S.lang==='es'?'Demostración: elige quién eres para probar los permisos. En la versión real cada persona entra con su propio enlace.':'Demo: pick who you are to test permissions. In the real version each person signs in with their own link.'}</div></div>
   <div class="card"><label class="f">${t('language')}</label><div class="row"><button class="btn ${S.lang==='es'?'y':''}" onclick="S.lang='es';saveS();render()">Español</button><button class="btn ${S.lang==='en'?'y':''}" onclick="S.lang='en';saveS();render()">English</button></div>
     <label class="f">${t('theme')}</label><div class="row"><button class="btn ${S.theme==='light'?'y':''}" onclick="S.theme='light';saveS();render()">☀️ ${t('light')}</button><button class="btn ${S.theme==='dark'?'y':''}" onclick="S.theme='dark';saveS();render()">🌙 ${t('dark')}</button></div></div>
   <div class="card"><h3>${t('backup')}</h3><div class="row wrap"><button class="btn b" onclick="A.backup()">💾 ${t('download_backup')}</button><label class="btn ghost">📂 ${t('restore_backup')}<input type="file" accept=".json" hidden onchange="A.restore(this)"></label></div></div>
+  ${can('admin')?classesCard():''}
   <div class="card"><div class="row wrap"><button class="btn ghost" onclick="A.demo()">${t('load_demo')}</button><button class="btn r" onclick="A.wipe()">${t('wipe')}</button></div></div>
-  <div class="card muted">${t('version')} 0.3.2 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
+  <div class="card muted">${t('version')} 0.4 · ${t('offline_demo')} · ${CONFIG.churchName} · <a href="${CONFIG.facebook}" target="_blank">Facebook</a></div>`;
 }
 
 /* === ACTIONS (A.) ===  Everything a button calls. Keep each one small. */
@@ -770,14 +797,28 @@ const A = {
   rsvp(id){ const u=me(); if(!u)return; const e=DB.events.find(x=>x.id===id); e.rsvp=e.rsvp||[]; const i=e.rsvp.indexOf(u.id); i>=0?e.rsvp.splice(i,1):e.rsvp.push(u.id); saveDB(); render(); },
   ics(date,time,title,place){ const [h,m]=time.split(':'); const s=date.replace(/-/g,'')+'T'+h+m+'00'; const e2=date.replace(/-/g,'')+'T'+String(+h+2).padStart(2,'0')+m+'00';
     download(title+'.ics',`BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//NuevoPacto//ES\nBEGIN:VEVENT\nUID:${uid()}@nuevopacto\nDTSTART:${s}\nDTEND:${e2}\nSUMMARY:${title}\nLOCATION:${place}\nEND:VEVENT\nEND:VCALENDAR`,'text/calendar'); },
-  eventForm(id){ const e=DB.events.find(x=>x.id===id)||{title:'',date:S.calSel,time:'19:00',place:'',details:'',ministry:'',color:'o'};
-    A.modal(`<h3>${id?t('edit'):t('add_event')}</h3><label class="f">${t('title')}</label><input type="text" id="e-title" value="${esc(e.title)}">
+  eventForm(id,presetGroup){ const e=DB.events.find(x=>x.id===id)||{title:'',date:S.calSel||todayYMD(),time:'19:00',place:'',details:'',ministry:'',color:'o',groupId:presetGroup||null};
+    const gopts=groupsICanManage().map(g=>({v:g.id,l:gLabel(g)})); const canPublic=can('edit');
+    A.modal(`<h3>${id?t('edit'):t('add_event')}</h3><label class="f">${t('for_group')}</label><select id="e-group">${canPublic?`<option value="">${t('public_event')}</option>`:''}${gopts.map(o=>`<option value="${o.v}" ${(e.groupId||'')===o.v?'selected':''}>${esc(o.l)}</option>`).join('')}</select>
+    <label class="f">${t('title')}</label><input type="text" id="e-title" value="${esc(e.title)}">
     <div class="row"><div class="grow"><label class="f">${t('date')}</label><input type="date" id="e-date" value="${e.date}"></div><div class="grow"><label class="f">${t('time')}</label><input type="time" id="e-time" value="${e.time}"></div></div>
     <label class="f">${t('place')}</label><input type="text" id="e-place" value="${esc(e.place)}"><label class="f">${t('ministry')}</label><input type="text" id="e-min" value="${esc(e.ministry)}" placeholder="${t('ministries_hint')}">
     <label class="f">${t('details')}</label><textarea id="e-det">${esc(e.details)}</textarea>
     <div class="row"><button class="btn p grow" onclick="A.saveEvent('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delEvent('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
-  saveEvent(id){ const g=i=>document.getElementById(i).value; const e=DB.events.find(x=>x.id===id)||{id:uid(),rsvp:[],color:'o'}; Object.assign(e,{title:g('e-title').trim(),date:g('e-date'),time:g('e-time'),place:g('e-place'),ministry:g('e-min'),details:g('e-det')});
+  saveEvent(id){ const g=i=>document.getElementById(i).value; const e=DB.events.find(x=>x.id===id)||{id:uid(),rsvp:[],color:'o'}; Object.assign(e,{title:g('e-title').trim(),date:g('e-date'),time:g('e-time'),place:g('e-place'),ministry:g('e-min'),details:g('e-det'),groupId:g('e-group')||null});
     if(!e.title)return; if(!id) DB.events.push(e); S.calSel=e.date; S.calMonth=e.date.slice(0,7); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  eventsImportForm(){ A.modal(`<h3>${t('import_events')}</h3><div class="hint">${t('events_import_hint')}</div><textarea id="imp" style="min-height:160px;font-family:monospace" placeholder="Título\tFecha\tHora\tLugar\tDetalles\tGrupo"></textarea>
+    <label class="btn ghost block">📂 CSV<input type="file" accept=".csv,.txt" hidden onchange="const r=new FileReader();r.onload=e=>document.getElementById('imp').value=e.target.result;r.readAsText(this.files[0])"></label>
+    <div class="row" style="margin-top:10px"><button class="btn p grow" onclick="A.doImportEvents()">${t('import')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  doImportEvents(){ const raw=document.getElementById('imp').value.trim(); if(!raw)return; const sep=raw.includes('\t')?'\t':','; const rows=raw.split(/\r?\n/).map(r=>r.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+    const head=rows[0].map(h=>h.toLowerCase()); const find=(...names)=>head.findIndex(h=>names.some(n=>h.includes(n)));
+    const iT=find('tít','tit','title','evento','event'), iD=find('fecha','date'), iH=find('hora','time'), iP=find('lugar','place','where'), iX=find('detal','detail','desc','notas','notes'), iG=find('grupo','group','minist');
+    if(iT<0||iD<0){ toast(t('events_import_hint')); return; } let n=0;
+    for(const r of rows.slice(1)){ const title=r[iT], date=normDate(r[iD]||''); if(!title||!date) continue; const time=normTime(iH>=0?r[iH]:'')||'19:00';
+      let groupId=null; if(iG>=0&&r[iG]){ const gg=DB.groups.find(x=>x.name.toLowerCase()===r[iG].toLowerCase()); if(gg) groupId=gg.id; }
+      if(DB.events.some(e=>e.title===title&&e.date===date&&e.time===time)) continue;
+      DB.events.push({id:uid(),title,date,time,place:iP>=0?r[iP]||'':'',details:iX>=0?r[iX]||'':'',ministry:'',color:'o',rsvp:[],groupId}); n++; }
+    saveDB(); A.closeModal(); render(); toast(`${n} ${t('imported')}`); },
   delEvent(id){ if(!sure('del'))return; DB.events=DB.events.filter(x=>x.id!==id); saveDB(); A.closeModal(); render(); },
   // --- attendance
   attDate(v){ S.attDate=v; const ss=servicesOn(v); S.attTime=ss[0]?ss[0].time:null; render(); },
@@ -812,9 +853,16 @@ const A = {
     Object.assign(r,{checkOutAt:Date.now(),pickedUpBy:by,unlisted,checkedOutBy:fullName(me())}); saveDB(); A.closeModal(); render(); },
   moveClass(cid){ const c=DB.children.find(x=>x.id===cid); const cur=groupOf(c);
     A.modal(`<h3>⇄ ${t('class_override')}: ${esc(c.name)}</h3><div class="muted" style="margin-bottom:6px">${ageOf(c.birthdate)!=null?ageOf(c.birthdate)+' '+t('age'):''}</div>
-    <select id="mc-class">${sel(CONFIG.ageGroups.map(g=>({v:g.id,l:L(g)})),cur)}</select><label class="chip" style="display:inline-block;margin-bottom:12px"><input type="checkbox" id="mc-auto" ${c.classId?'':'checked'}> ${t('auto_by_age')}</label>
+    <select id="mc-class">${sel(AG().map(g=>({v:g.id,l:L(g)})),cur)}</select><label class="chip" style="display:inline-block;margin-bottom:12px"><input type="checkbox" id="mc-auto" ${c.classId?'':'checked'}> ${t('auto_by_age')}</label>
     <div class="row"><button class="btn p grow" onclick="A.moveClassSave('${cid}')">${t('save')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
   moveClassSave(cid){ const c=DB.children.find(x=>x.id===cid); const auto=document.getElementById('mc-auto').checked; c.classId=auto?null:document.getElementById('mc-class').value; S.kidsGroup=groupOf(c); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  // --- kids classes (admin)
+  classesForm(){ const rows=AG().map((g,i)=>classRow(g,i)).join('');
+    A.modal(`<h3>${t('kids_classes')}</h3><div id="cls-rows">${rows}</div><div class="row wrap" style="margin:8px 0"><button class="btn sm ghost" onclick="document.getElementById('cls-rows').insertAdjacentHTML('beforeend',classRow({id:'g'+Date.now().toString(36),es:'',en:'',min:0,max:0},-1))">＋ ${t('add_class')}</button><button class="btn sm ghost" onclick="A.classesReset()">${t('reset_classes')}</button></div>
+    <div class="row"><button class="btn p grow" onclick="A.classesSave()">${t('save')}</button><button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
+  classesSave(){ const out=[]; document.querySelectorAll('#cls-rows .cls').forEach(r=>{ const q=k=>r.querySelector('[data-k='+k+']').value.trim(); const es=q('es'), en=q('en')||es, min=+q('min'), max=+q('max'); if(!es) return; out.push({id:r.dataset.id,es,en,min:isNaN(min)?0:min,max:isNaN(max)?min:max}); });
+    if(!out.length) return; out.sort((a,b)=>a.min-b.min); DB.ageGroups=out; saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  classesReset(){ DB.ageGroups=null; saveDB(); A.closeModal(); render(); toast(t('saved')); },
   // --- hymns
   hymnForm(id){ const x=DB.hymns.find(h=>h.id===id)||{title:'',key:'',lyrics:'',tags:'',photo:null};
     A.modal(`<h3>${id?t('edit'):t('add_hymn')}</h3><label class="f">${t('song_title')}</label><input type="text" id="h-title" value="${esc(x.title)}"><label class="f">${t('key')}</label><input type="text" id="h-key" value="${esc(x.key)}" style="width:120px">
@@ -868,7 +916,7 @@ const A = {
   childForm(hhId,id){ const c=DB.children.find(x=>x.id===id)||{name:'',birthdate:'',allergies:'',pickup:[],classId:''}; hhId=hhId||c.householdId||'';
     A.modal(`<h3>${id?t('edit'):t('add_child')}</h3><label class="f">${t('household')}</label><select id="c-hh">${sel([...DB.households].sort((a,b)=>a.name.localeCompare(b.name)).map(h=>({v:h.id,l:h.name})),hhId,t('pick_household'))}</select>
     <label class="f">${t('child_name')}</label><input type="text" id="c-name" value="${esc(c.name)}"><label class="f">${t('birthdate')}</label><input type="date" id="c-birth" value="${c.birthdate}">
-    <label class="f">${t('class_override')}</label><select id="c-class">${sel(CONFIG.ageGroups.map(g=>({v:g.id,l:L(g)})),c.classId||'',t('auto_by_age'))}</select>
+    <label class="f">${t('class_override')}</label><select id="c-class">${sel(AG().map(g=>({v:g.id,l:L(g)})),c.classId||'',t('auto_by_age'))}</select>
     <label class="f">${t('allergies')}</label><input type="text" id="c-all" value="${esc(c.allergies)}"><label class="f">${t('pickup_list')}</label><textarea id="c-pick">${esc((c.pickup||[]).join('\n'))}</textarea>
     <div class="row"><button class="btn p grow" onclick="A.saveChild('${hhId}','${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delChild('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
   saveChild(hhId,id){ hhId=document.getElementById('c-hh').value; if(!hhId){ toast(t('pick_household')); return; } const c=DB.children.find(x=>x.id===id)||{id:uid()}; c.householdId=hhId; c.classId=document.getElementById('c-class').value||null; Object.assign(c,{name:document.getElementById('c-name').value.trim(),birthdate:document.getElementById('c-birth').value,allergies:document.getElementById('c-all').value.trim(),pickup:document.getElementById('c-pick').value.split('\n').map(s=>s.trim()).filter(Boolean)});
@@ -888,11 +936,12 @@ const A = {
   exportCSV(){ const rows=[['Nombre','Apellido','Teléfono','Correo','Fecha de nacimiento','Ministerio','Rol','Familia'],...DB.members.map(m=>[m.first,m.last,m.phone,m.email,m.birthdate,m.ministry,m.role,DB.households.find(h=>h.id===m.householdId)?.name||''])];
     download('miembros.csv','﻿'+rows.map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv'); },
   // --- groups
-  groupForm(id){ const g=DB.groups.find(x=>x.id===id)||{name:'',color:'blue',memberIds:[]};
-    A.modal(`<h3>${id?t('edit'):t('new_group')}</h3><label class="f">${t('group_name')}</label><input type="text" id="g-name" value="${esc(g.name)}"><label class="f">${t('color')}</label><select id="g-color">${sel(['red','gold','blue','purple'].map(c=>({v:c,l:c})),g.color)}</select>
-    <label class="f">${t('group_members')}</label><div class="card list" style="max-height:40vh;overflow:auto">${[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>`<label class="item"><input type="checkbox" class="g-m" value="${m.id}" ${g.memberIds.includes(m.id)?'checked':''}> ${esc(fullName(m))}</label>`).join('')}</div>
+  groupForm(id){ const g=DB.groups.find(x=>x.id===id)||{name:'',color:'blue',emoji:'',memberIds:[],leadIds:[]}; const full=can('edit');
+    A.modal(`<h3>${id?t('edit'):t('new_group')}</h3><div class="row"><div class="grow"><label class="f">${t('group_name')}</label><input type="text" id="g-name" value="${esc(g.name)}" ${full?'':'readonly'}></div><div style="width:90px"><label class="f">${t('emoji')}</label><input type="text" id="g-emoji" value="${esc(g.emoji||'')}" placeholder="🎵" maxlength="4"></div></div>
+    ${full?`<label class="f">${t('color')}</label><select id="g-color">${sel(['red','gold','blue','purple'].map(c=>({v:c,l:c})),g.color)}</select>`:`<input type="hidden" id="g-color" value="${esc(g.color||'blue')}">`}
+    <label class="f">${t('group_members')} <span class="muted">(⭐ = ${t('lead_mark')})</span></label><div class="card list" style="max-height:40vh;overflow:auto">${[...DB.members].sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(m=>`<div class="item" style="padding:8px 4px"><label class="grow row"><input type="checkbox" class="g-m" value="${m.id}" ${g.memberIds.includes(m.id)?'checked':''}> ${esc(fullName(m))}</label><label class="chip" title="${t('group_leads')}"><input type="checkbox" class="g-l" value="${m.id}" ${(g.leadIds||[]).includes(m.id)?'checked':''} ${full?'':'disabled'}> ⭐</label></div>`).join('')}</div>
     <div class="row"><button class="btn p grow" onclick="A.saveGroup('${id||''}')">${t('save')}</button>${id?`<button class="btn r" onclick="A.delGroup('${id}')">🗑</button>`:''}<button class="btn" onclick="A.closeModal()">${t('cancel')}</button></div>`); },
-  saveGroup(id){ const g=DB.groups.find(x=>x.id===id)||{id:uid()}; g.name=document.getElementById('g-name').value.trim(); g.color=document.getElementById('g-color').value; g.memberIds=[...document.querySelectorAll('.g-m:checked')].map(c=>c.value); if(!g.name)return; if(!id) DB.groups.push(g); saveDB(); A.closeModal(); render(); toast(t('saved')); },
+  saveGroup(id){ const g=DB.groups.find(x=>x.id===id)||{id:uid(),leadIds:[]}; g.name=document.getElementById('g-name').value.trim(); g.emoji=document.getElementById('g-emoji').value.trim(); g.color=document.getElementById('g-color').value; g.memberIds=[...document.querySelectorAll('.g-m:checked')].map(c=>c.value); if(can('edit')) g.leadIds=[...document.querySelectorAll('.g-l:checked')].map(c=>c.value); if(!g.name)return; if(!id) DB.groups.push(g); saveDB(); A.closeModal(); render(); toast(t('saved')); },
   delGroup(id){ if(!sure('del'))return; DB.groups=DB.groups.filter(x=>x.id!==id); DB.posts=DB.posts.filter(p=>p.groupId!==id); saveDB(); A.closeModal(); A.go('groups'); },
   // --- administrator messages
   sendAdminMsg(){ const text=document.getElementById('amText').value.trim(); if(!text)return; const u=me(); DB.adminMsgs.unshift({id:uid(),fromId:u?u.id:null,fromName:u?fullName(u):'—',text,at:Date.now(),read:false}); saveDB(); render(); toast(t('sent')); },
@@ -921,6 +970,9 @@ const A = {
   demo(){ loadDemo(); render(); toast(t('saved')); },
   wipe(){ if(!sure('wipe'))return; DB=emptyDB(); S.userId=null; saveDB(); saveS(); render(); },
 };
+function classRow(g,i){ return `<div class="cls card" data-id="${esc(g.id)}" style="padding:8px"><div class="row"><input type="text" data-k="es" value="${esc(g.es)}" placeholder="${t('class_name_es')}" style="margin:0"><input type="text" data-k="en" value="${esc(g.en)}" placeholder="${t('class_name_en')}" style="margin:0"></div>
+  <div class="row" style="margin-top:6px"><input type="number" data-k="min" value="${g.min}" min="0" max="99" style="margin:0" placeholder="${t('age_min')}"><input type="number" data-k="max" value="${g.max}" min="0" max="99" style="margin:0" placeholder="${t('age_max')}"><button class="btn sm ghost" onclick="this.closest('.cls').remove()">✕</button></div></div>`; }
+function normTime(s){ if(!s) return ''; s=String(s).trim().toLowerCase(); let m=s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?$/); if(!m) return ''; let h=+m[1], mi=m[2]?+m[2]:0; const ap=(m[3]||'').replace(/\./g,''); if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; if(h>23||mi>59) return ''; return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0'); }
 function normDate(s){ if(!s)return ''; if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s; const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/); if(m){ let y=m[3]; if(y.length===2) y=(+y>30?'19':'20')+y; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; } return ''; }
 
 /* === INIT === */
